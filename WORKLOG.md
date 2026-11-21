@@ -4,6 +4,23 @@ Reverse-chronological. Each entry: timestamp · task · files · tests · blocke
 
 ---
 
+## 2026-11-21 — landed, live, release-ready
+
+- Public repo https://github.com/xantiagoma/xtandard-links; PRs #1–#9 (docker bun, examples +
+  review fixes, docs site, docs-review fixes, UI/embeds/e2e/screenshots, release prep v0.1.0,
+  UI conversion filters, docs follow-up, changelog pages). CI green on main: unit + conformance
+  (live Redis, Mongo, Postgres, MySQL, ClickHouse), coverage thresholds, typecheck incl. examples
+  and Elysia 2, lint/fmt, build, publint, pack, Playwright e2e; Docker image; Pages.
+- Docs site live at https://me.xantiagoma.com/xtandard-links/ (https og:url/og:image).
+- Fixes from reviews: unknown slugs fall through; conversions carry click dimensions; deferred
+  handoffs carry the web destination; Workers waitUntil bound; edge counter flush; claim
+  `platform`; VISITOR_SALT; CLI prune prunes rollups; storage hardening (case/metacharacters,
+  MySQL collation/escape, unstorage escaping, Redis exact prefix).
+- READY TO PUBLISH sent to t1r (owner: create package / trusted publisher / tag v0.1.0).
+- Known gaps: Tinybird and Analytics Engine sinks verified against ClickHouse shims, not the
+  real services; Next.js and Workers examples are typechecked, not deployed; KV rollups do not
+  count uniques or cross-filter (OLAP sinks do).
+
 ## 2026-11-20 (evening) — spine, fan-out, brand
 
 - Spine (lead): schema, ids (monotonic ULID-style), slugs, keys, validation, core (tenants, domains,
