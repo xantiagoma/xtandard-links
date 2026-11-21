@@ -61,7 +61,7 @@ export interface MongoStorageOptions {
  * passed in is left for you to manage.
  *
  * Note: `watch` is deliberately absent (see the module docs); this is not a
- * {@link import("./contract.ts").WatchableLinksStorage}.
+ * `WatchableLinksStorage`.
  */
 export interface MongoLinksStorage extends CompareAndSwapLinksStorage {
   /** Disconnect the underlying client if this adapter created it. No-op otherwise. */
