@@ -164,6 +164,7 @@ function KpiTile({
   series,
   selected,
   onSelect,
+  unavailable,
 }: {
   metric: MetricKey;
   value: number;
@@ -171,8 +172,30 @@ function KpiTile({
   series: number[];
   selected: boolean;
   onSelect: () => void;
+  /** Why the metric cannot be shown for the current filters. */
+  unavailable?: string;
 }) {
   const meta = METRIC_META[metric];
+  if (unavailable) {
+    return (
+      <div
+        className="flex min-w-0 flex-col gap-1 rounded-xl border border-dashed border-border bg-card px-4 pb-2 pt-3.5"
+        title={unavailable}
+      >
+        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <span className="size-1.5 rounded-full" style={{ background: meta.color }} />
+          {meta.label}
+        </span>
+        <span
+          className="text-2xl font-semibold tracking-tight text-muted-foreground"
+          data-testid={`kpi-${metric}`}
+        >
+          —
+        </span>
+        <span className="text-[11px] leading-tight text-muted-foreground">{unavailable}</span>
+      </div>
+    );
+  }
   return (
     <button
       type="button"
@@ -437,6 +460,8 @@ export function AnalyticsPanel({
     value: metricValue(b, metric),
   }));
   const active = filterEntries(filters);
+  // Leads and sales carry only link + domain, so visitor-dimension filters zero them out.
+  const visitorFilter = active.some(([dim]) => dim !== "link" && dim !== "domain");
 
   const cards: { title: string; tabs: BreakdownTab[] }[] = [
     ...(showLinkBreakdown
@@ -556,6 +581,11 @@ export function AnalyticsPanel({
             series={series(key)}
             selected={metric === key}
             onSelect={() => update({ metric: key })}
+            unavailable={
+              visitorFilter && (key === "leads" || key === "sales" || key === "saleAmount")
+                ? "Conversions aren't broken down by visitor filters."
+                : undefined
+            }
           />
         ))}
       </div>

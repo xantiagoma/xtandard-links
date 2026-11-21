@@ -3,10 +3,11 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = 3311;
 
 /**
- * Browser e2e for the bundled admin UI and the React embed. Builds the UI bundle
- * and the embed (dist/react.js + scoped react.css), then boots the
- * in-memory e2e server (panel + dispatcher + in-process test receiver — see
- * e2e/server.ts) and drives the real SPA.
+ * Browser e2e for the bundled admin UI and the React embeds. Builds the UI
+ * bundle and the embed (dist/react.js + scoped react.css), then boots the
+ * seeded in-memory demo app (panel at /links + redirect handler + viewer-token
+ * and embed-host helper routes — see e2e/server.ts, scripts/demo-app.ts) and
+ * drives the real SPA.
  *
  *   bun run test:e2e
  */

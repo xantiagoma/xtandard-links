@@ -70,14 +70,22 @@ function useDebounced<T>(value: T, ms: number): T {
 }
 
 /** Status badges summarising what a link does beyond a plain redirect. */
-export function LinkBadges({ link, now = Date.now() }: { link: PublicLink; now?: number }) {
+export function LinkBadges({
+  link,
+  now = Date.now(),
+  className,
+}: {
+  link: PublicLink;
+  now?: number;
+  className?: string;
+}) {
   const expired =
     (link.expiresAt && Date.parse(link.expiresAt) <= now) ||
     (link.maxClicks !== undefined && (link.clicks ?? 0) >= link.maxClicks);
   const variants = link.rules.some((r) => r.variants?.length);
   const geoRules = link.rules.filter((r) => !r.variants?.length).length;
   return (
-    <span className="flex flex-wrap items-center gap-1">
+    <span className={cn("flex flex-wrap items-center gap-1", className)}>
       {link.disabled && <StatusBadge tone="danger">Disabled</StatusBadge>}
       {link.archived && <StatusBadge>Archived</StatusBadge>}
       {expired ? (
@@ -112,15 +120,28 @@ export function LinkBadges({ link, now = Date.now() }: { link: PublicLink; now?:
   );
 }
 
-/** A small letter tile for the destination host (no third-party favicon fetches). */
+/** Stable hue (0–359) for a string. */
+function hue(text: string): number {
+  let h = 0;
+  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;
+  return h % 360;
+}
+
+/** A tinted letter tile for the destination host (no third-party favicon fetches). */
 function HostTile({ url }: { url: string }) {
-  const host = hostOf(url);
+  const host = hostOf(url).replace(/^www\./, "");
+  const h = hue(host);
   return (
     <span
       aria-hidden
-      className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary/60 text-[12px] font-semibold uppercase text-muted-foreground"
+      title={host}
+      className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[12px] font-semibold uppercase"
+      style={{
+        background: `oklch(0.62 0.12 ${h} / 0.14)`,
+        color: `oklch(0.55 0.12 ${h})`,
+      }}
     >
-      {host.replace(/^www\./, "").charAt(0) || "·"}
+      {host.charAt(0) || "·"}
     </span>
   );
 }
@@ -171,7 +192,7 @@ export function LinksView() {
   const domainsQuery = useQuery({
     queryKey: ["domains", tenant],
     queryFn: () => listDomains(tenant),
-    enabled: !!tenant && !viewer,
+    enabled: !!tenant && can("domain:read"),
     staleTime: 60_000,
   });
   const tagsQuery = useQuery({
@@ -372,7 +393,7 @@ export function LinksView() {
                     onClick={() => go(`/links/${encodeURIComponent(link.id)}`)}
                     data-testid="link-row"
                   >
-                    <td className="max-w-0 px-4 py-3">
+                    <td className="w-full max-w-0 px-4 py-3">
                       <div className="flex min-w-0 items-center gap-3">
                         <HostTile url={link.url} />
                         <div className="min-w-0 flex-1">
@@ -385,7 +406,7 @@ export function LinksView() {
                               label={`Copy ${link.domain}/${link.slug}`}
                               toastMessage="Short link copied"
                             />
-                            <LinkBadges link={link} />
+                            <LinkBadges link={link} className="shrink-0 flex-nowrap" />
                           </div>
                           <p
                             className="truncate text-[12px] text-muted-foreground"
@@ -400,7 +421,7 @@ export function LinksView() {
                       </div>
                     </td>
                     <td className="hidden px-3 py-3 lg:table-cell">
-                      <div className="flex max-w-56 flex-wrap gap-1">
+                      <div className="flex items-center gap-1 whitespace-nowrap">
                         {link.tags.slice(0, 3).map((t) => (
                           <TagPill
                             key={t}

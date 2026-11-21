@@ -178,7 +178,7 @@ export function ImportView() {
           >
             <TextArea
               aria-label="CSV contents"
-              rows={12}
+              rows={17}
               spellCheck={false}
               placeholder={"url,slug,title,tags\nhttps://acme.com/pricing,pricing,Pricing,web"}
               value={csv}

@@ -314,6 +314,7 @@ export function BarList({
               <button
                 type="button"
                 title={active ? `Remove filter: ${row.text}` : `Filter by ${row.text}`}
+                aria-label={`${active ? "Remove filter:" : "Filter by"} ${row.text} (${formatValue(row.value)})`}
                 aria-pressed={active}
                 onClick={() => onSelect(row.key)}
                 className={cls}

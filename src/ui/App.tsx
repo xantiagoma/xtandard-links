@@ -161,7 +161,9 @@ function AppShell({
 
   const setTenant = (key: string) => {
     if (!canLeave()) return;
-    setSearchParams(() => new URLSearchParams({ tenant: key }));
+    // A link detail belongs to the old tenant: land on the list instead.
+    if (location.startsWith("/links/")) navigate(`/?tenant=${encodeURIComponent(key)}`);
+    else setSearchParams(() => new URLSearchParams({ tenant: key }));
   };
 
   const createTenant = useMutation({
@@ -292,7 +294,7 @@ function AppShell({
             <Page>
               <EmptyCard icon={<Lock className="size-4" />}>
                 {unauthorized
-                  ? "Your session is not authorized for this panel."
+                  ? `Not authorized: ${errorMessage(configQuery.error, "sign in to use this panel.")}`
                   : errorMessage(configQuery.error, "Could not reach the links panel.")}
               </EmptyCard>
             </Page>

@@ -481,7 +481,7 @@ export function DomainsView() {
                   </div>
                 )}
               </div>
-              <dl className="mt-3 grid flex-1 grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 border-t border-border px-4 py-3 text-[12.5px]">
+              <dl className="mt-3 grid flex-1 content-start grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 border-t border-border px-4 py-3 text-[12.5px]">
                 <dt className="text-muted-foreground">Root</dt>
                 <dd className="truncate">
                   {d.rootUrl ? (

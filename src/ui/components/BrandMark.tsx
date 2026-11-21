@@ -1,3 +1,4 @@
+/// <reference path="../assets.d.ts" />
 import * as React from "react";
 import symbolSvg from "../public/symbol.svg?raw";
 import { cn } from "../lib/utils.ts";
