@@ -1,0 +1,617 @@
+{
+  "name": "@xtandard/links",
+  "version": "0.0.0",
+  "description": "Self-hosted, embeddable branded short links: memory-first redirects, click analytics, conversion attribution and deep links, with pluggable storage and an embeddable admin UI.",
+  "keywords": [
+    "analytics",
+    "bitly",
+    "branded-links",
+    "bun",
+    "click-tracking",
+    "deep-links",
+    "dub",
+    "link-management",
+    "link-shortener",
+    "qr-code",
+    "redirect",
+    "self-hosted",
+    "short-links",
+    "shortener",
+    "typescript",
+    "url-shortener",
+    "utm",
+    "xtandard"
+  ],
+  "homepage": "https://me.xantiagoma.com/xtandard-links/",
+  "bugs": {
+    "url": "https://github.com/xantiagoma/xtandard-links/issues"
+  },
+  "license": "MIT",
+  "author": "Santiago Montoya",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xantiagoma/xtandard-links.git"
+  },
+  "bin": {
+    "xtandard-links": "./bin/xtandard-links.mjs"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./core": {
+      "import": {
+        "types": "./dist/core.d.mts",
+        "default": "./dist/core.mjs"
+      },
+      "require": {
+        "types": "./dist/core.d.cts",
+        "default": "./dist/core.cjs"
+      }
+    },
+    "./schema": {
+      "import": {
+        "types": "./dist/schema.d.mts",
+        "default": "./dist/schema.mjs"
+      },
+      "require": {
+        "types": "./dist/schema.d.cts",
+        "default": "./dist/schema.cjs"
+      }
+    },
+    "./redirect": {
+      "import": {
+        "types": "./dist/redirect.d.mts",
+        "default": "./dist/redirect.mjs"
+      },
+      "require": {
+        "types": "./dist/redirect.d.cts",
+        "default": "./dist/redirect.cjs"
+      }
+    },
+    "./client": {
+      "import": {
+        "types": "./dist/client.d.mts",
+        "default": "./dist/client.mjs"
+      },
+      "require": {
+        "types": "./dist/client.d.cts",
+        "default": "./dist/client.cjs"
+      }
+    },
+    "./deeplinks": {
+      "import": {
+        "types": "./dist/deeplinks.d.mts",
+        "default": "./dist/deeplinks.mjs"
+      },
+      "require": {
+        "types": "./dist/deeplinks.d.cts",
+        "default": "./dist/deeplinks.cjs"
+      }
+    },
+    "./qr": {
+      "import": {
+        "types": "./dist/qr.d.mts",
+        "default": "./dist/qr.mjs"
+      },
+      "require": {
+        "types": "./dist/qr.d.cts",
+        "default": "./dist/qr.cjs"
+      }
+    },
+    "./import": {
+      "import": {
+        "types": "./dist/import.d.mts",
+        "default": "./dist/import.mjs"
+      },
+      "require": {
+        "types": "./dist/import.d.cts",
+        "default": "./dist/import.cjs"
+      }
+    },
+    "./testing": {
+      "import": {
+        "types": "./dist/testing.d.mts",
+        "default": "./dist/testing.mjs"
+      },
+      "require": {
+        "types": "./dist/testing.d.cts",
+        "default": "./dist/testing.cjs"
+      }
+    },
+    "./storage/memory": {
+      "import": {
+        "types": "./dist/entry-storage-memory.d.mts",
+        "default": "./dist/entry-storage-memory.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-storage-memory.d.cts",
+        "default": "./dist/entry-storage-memory.cjs"
+      }
+    },
+    "./storage/file": {
+      "import": {
+        "types": "./dist/entry-storage-file.d.mts",
+        "default": "./dist/entry-storage-file.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-storage-file.d.cts",
+        "default": "./dist/entry-storage-file.cjs"
+      }
+    },
+    "./storage/redis": {
+      "import": {
+        "types": "./dist/entry-storage-redis.d.mts",
+        "default": "./dist/entry-storage-redis.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-storage-redis.d.cts",
+        "default": "./dist/entry-storage-redis.cjs"
+      }
+    },
+    "./storage/postgres": {
+      "import": {
+        "types": "./dist/entry-storage-postgres.d.mts",
+        "default": "./dist/entry-storage-postgres.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-storage-postgres.d.cts",
+        "default": "./dist/entry-storage-postgres.cjs"
+      }
+    },
+    "./storage/drizzle": {
+      "import": {
+        "types": "./dist/entry-storage-drizzle.d.mts",
+        "default": "./dist/entry-storage-drizzle.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-storage-drizzle.d.cts",
+        "default": "./dist/entry-storage-drizzle.cjs"
+      }
+    },
+    "./storage/mongodb": {
+      "import": {
+        "types": "./dist/entry-storage-mongodb.d.mts",
+        "default": "./dist/entry-storage-mongodb.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-storage-mongodb.d.cts",
+        "default": "./dist/entry-storage-mongodb.cjs"
+      }
+    },
+    "./storage/sqlite": {
+      "import": {
+        "types": "./dist/entry-storage-sqlite.d.mts",
+        "default": "./dist/entry-storage-sqlite.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-storage-sqlite.d.cts",
+        "default": "./dist/entry-storage-sqlite.cjs"
+      }
+    },
+    "./storage/libsql": {
+      "import": {
+        "types": "./dist/entry-storage-libsql.d.mts",
+        "default": "./dist/entry-storage-libsql.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-storage-libsql.d.cts",
+        "default": "./dist/entry-storage-libsql.cjs"
+      }
+    },
+    "./storage/unstorage": {
+      "import": {
+        "types": "./dist/entry-storage-unstorage.d.mts",
+        "default": "./dist/entry-storage-unstorage.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-storage-unstorage.d.cts",
+        "default": "./dist/entry-storage-unstorage.cjs"
+      }
+    },
+    "./storage/cloudflare-kv": {
+      "import": {
+        "types": "./dist/entry-storage-cloudflare-kv.d.mts",
+        "default": "./dist/entry-storage-cloudflare-kv.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-storage-cloudflare-kv.d.cts",
+        "default": "./dist/entry-storage-cloudflare-kv.cjs"
+      }
+    },
+    "./drizzle/pg": {
+      "import": {
+        "types": "./dist/entry-drizzle-pg.d.mts",
+        "default": "./dist/entry-drizzle-pg.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-drizzle-pg.d.cts",
+        "default": "./dist/entry-drizzle-pg.cjs"
+      }
+    },
+    "./drizzle/mysql": {
+      "import": {
+        "types": "./dist/entry-drizzle-mysql.d.mts",
+        "default": "./dist/entry-drizzle-mysql.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-drizzle-mysql.d.cts",
+        "default": "./dist/entry-drizzle-mysql.cjs"
+      }
+    },
+    "./drizzle/sqlite": {
+      "import": {
+        "types": "./dist/entry-drizzle-sqlite.d.mts",
+        "default": "./dist/entry-drizzle-sqlite.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-drizzle-sqlite.d.cts",
+        "default": "./dist/entry-drizzle-sqlite.cjs"
+      }
+    },
+    "./analytics/kv": {
+      "import": {
+        "types": "./dist/entry-analytics-kv.d.mts",
+        "default": "./dist/entry-analytics-kv.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-analytics-kv.d.cts",
+        "default": "./dist/entry-analytics-kv.cjs"
+      }
+    },
+    "./analytics/memory": {
+      "import": {
+        "types": "./dist/entry-analytics-memory.d.mts",
+        "default": "./dist/entry-analytics-memory.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-analytics-memory.d.cts",
+        "default": "./dist/entry-analytics-memory.cjs"
+      }
+    },
+    "./analytics/clickhouse": {
+      "import": {
+        "types": "./dist/entry-analytics-clickhouse.d.mts",
+        "default": "./dist/entry-analytics-clickhouse.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-analytics-clickhouse.d.cts",
+        "default": "./dist/entry-analytics-clickhouse.cjs"
+      }
+    },
+    "./analytics/tinybird": {
+      "import": {
+        "types": "./dist/entry-analytics-tinybird.d.mts",
+        "default": "./dist/entry-analytics-tinybird.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-analytics-tinybird.d.cts",
+        "default": "./dist/entry-analytics-tinybird.cjs"
+      }
+    },
+    "./analytics/analytics-engine": {
+      "import": {
+        "types": "./dist/entry-analytics-analytics-engine.d.mts",
+        "default": "./dist/entry-analytics-analytics-engine.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-analytics-analytics-engine.d.cts",
+        "default": "./dist/entry-analytics-analytics-engine.cjs"
+      }
+    },
+    "./auth/none": {
+      "import": {
+        "types": "./dist/entry-auth-none.d.mts",
+        "default": "./dist/entry-auth-none.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-auth-none.d.cts",
+        "default": "./dist/entry-auth-none.cjs"
+      }
+    },
+    "./auth/basic": {
+      "import": {
+        "types": "./dist/entry-auth-basic.d.mts",
+        "default": "./dist/entry-auth-basic.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-auth-basic.d.cts",
+        "default": "./dist/entry-auth-basic.cjs"
+      }
+    },
+    "./auth/delegated": {
+      "import": {
+        "types": "./dist/entry-auth-delegated.d.mts",
+        "default": "./dist/entry-auth-delegated.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-auth-delegated.d.cts",
+        "default": "./dist/entry-auth-delegated.cjs"
+      }
+    },
+    "./authorization/none": {
+      "import": {
+        "types": "./dist/entry-authorization-none.d.mts",
+        "default": "./dist/entry-authorization-none.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-authorization-none.d.cts",
+        "default": "./dist/entry-authorization-none.cjs"
+      }
+    },
+    "./authorization/roles": {
+      "import": {
+        "types": "./dist/entry-authorization-roles.d.mts",
+        "default": "./dist/entry-authorization-roles.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-authorization-roles.d.cts",
+        "default": "./dist/entry-authorization-roles.cjs"
+      }
+    },
+    "./authorization/delegated": {
+      "import": {
+        "types": "./dist/entry-authorization-delegated.d.mts",
+        "default": "./dist/entry-authorization-delegated.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-authorization-delegated.d.cts",
+        "default": "./dist/entry-authorization-delegated.cjs"
+      }
+    },
+    "./hooks/log": {
+      "import": {
+        "types": "./dist/entry-hooks-log.d.mts",
+        "default": "./dist/entry-hooks-log.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-hooks-log.d.cts",
+        "default": "./dist/entry-hooks-log.cjs"
+      }
+    },
+    "./bridges/webhooks": {
+      "import": {
+        "types": "./dist/entry-bridges-webhooks.d.mts",
+        "default": "./dist/entry-bridges-webhooks.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-bridges-webhooks.d.cts",
+        "default": "./dist/entry-bridges-webhooks.cjs"
+      }
+    },
+    "./bridges/audit": {
+      "import": {
+        "types": "./dist/entry-bridges-audit.d.mts",
+        "default": "./dist/entry-bridges-audit.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-bridges-audit.d.cts",
+        "default": "./dist/entry-bridges-audit.cjs"
+      }
+    },
+    "./elysia": {
+      "import": {
+        "types": "./dist/entry-elysia.d.mts",
+        "default": "./dist/entry-elysia.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-elysia.d.cts",
+        "default": "./dist/entry-elysia.cjs"
+      }
+    },
+    "./elysia2": {
+      "import": {
+        "types": "./dist/types-elysia2/entry-elysia2.d.ts",
+        "default": "./dist/entry-elysia2.mjs"
+      },
+      "require": {
+        "types": "./dist/types-elysia2/entry-elysia2.d.ts",
+        "default": "./dist/entry-elysia2.cjs"
+      }
+    },
+    "./hono": {
+      "import": {
+        "types": "./dist/entry-hono.d.mts",
+        "default": "./dist/entry-hono.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-hono.d.cts",
+        "default": "./dist/entry-hono.cjs"
+      }
+    },
+    "./express": {
+      "import": {
+        "types": "./dist/entry-express.d.mts",
+        "default": "./dist/entry-express.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-express.d.cts",
+        "default": "./dist/entry-express.cjs"
+      }
+    },
+    "./bun": {
+      "import": {
+        "types": "./dist/entry-bun.d.mts",
+        "default": "./dist/entry-bun.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-bun.d.cts",
+        "default": "./dist/entry-bun.cjs"
+      }
+    },
+    "./next": {
+      "import": {
+        "types": "./dist/entry-next.d.mts",
+        "default": "./dist/entry-next.mjs"
+      },
+      "require": {
+        "types": "./dist/entry-next.d.cts",
+        "default": "./dist/entry-next.cjs"
+      }
+    },
+    "./react": {
+      "import": {
+        "types": "./dist/types-react/react.d.ts",
+        "default": "./dist/react.js"
+      }
+    },
+    "./react/styles.css": "./dist/react.css",
+    "./ui/*": "./dist/ui/*",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "bun run build:lib && bun run build:elysia2-types && bun run build:ui && bun run build:react",
+    "build:lib": "vp pack",
+    "build:elysia2-types": "tsc -p tsconfig.elysia2.build.json && bun scripts/fix-elysia2-types.ts",
+    "test": "vp test run",
+    "test:coverage": "vp test run --coverage",
+    "test:bun": "bun test ./test/*.bun.test.ts",
+    "lint": "vp lint",
+    "format": "vp fmt",
+    "format:check": "vp fmt --check",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.elysia2.json",
+    "check": "vp lint && vp fmt --check && bun run typecheck",
+    "prepare": "husky || true",
+    "build:ui": "vite build --config vite.ui.config.ts",
+    "dev:ui": "vite --config vite.ui.config.ts",
+    "test:e2e": "playwright test",
+    "standalone": "bun run apps/standalone/src/index.ts",
+    "build:react": "vite build --config vite.react.config.ts && bun scripts/scope-embed-css.ts && tsc -p tsconfig.react.json",
+    "docs:dev": "cd site && bun install && bun run dev",
+    "docs:build": "cd site && bun install && bun run build",
+    "docs:preview": "cd site && bun run preview",
+    "demo": "bun scripts/demo.ts",
+    "seed:demo": "bun scripts/seed-demo.ts",
+    "typecheck:examples": "tsc -p examples/tsconfig.json",
+    "examples:hono": "bun scripts/example.ts hono",
+    "examples:elysia": "bun scripts/example.ts elysia",
+    "examples:express": "bun scripts/example.ts express",
+    "examples:bun": "bun scripts/example.ts bun",
+    "examples:conversions": "bun scripts/example.ts conversions",
+    "examples:deep-links": "bun scripts/example.ts deep-links",
+    "examples:storage-drivers": "bun scripts/example.ts storage-drivers",
+    "examples:react-embed": "bun scripts/example.ts react-embed",
+    "release": "changelogen --release --push"
+  },
+  "dependencies": {
+    "uqr": "^0.1.3",
+    "valibot": "^1.0.0",
+    "wouter": "^3.10.0"
+  },
+  "devDependencies": {
+    "@base-ui-components/react": "1.0.0-rc.0",
+    "@electric-sql/pglite": "^0.2.0",
+    "@elysia/eden": "2.0.0-rc.0",
+    "@elysiajs/eden": "^1.4",
+    "@playwright/test": "^1.49.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@tanstack/react-query": "^5.62.0",
+    "@types/bun": "^1.1.14",
+    "@types/express": "^5.0.0",
+    "@types/pg": "^8.11.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^4.1.6",
+    "changelogen": "^0.6.2",
+    "class-variance-authority": "^0.7",
+    "clsx": "^2.1",
+    "drizzle-orm": "^0.45.2",
+    "elysia": "^1.4",
+    "elysia-v2": "npm:elysia@2.0.0-rc.0",
+    "exact-mirror": "^1.2.6",
+    "express": "^5.0.0",
+    "get-port-please": "^3.2.0",
+    "hono": "^4.6.0",
+    "husky": "^9.1.7",
+    "lucide-react": "^1.22",
+    "mongodb": "^6.10.0",
+    "pg": "^8.13.0",
+    "playwright": "^1.49.0",
+    "postcss": "^8.5.16",
+    "postcss-prefix-selector": "^2.1.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "redis": "^5.0.0",
+    "tailwind-merge": "^3.6",
+    "tailwindcss": "^4.0.0",
+    "typebox": "^1.4.3",
+    "typedoc": "^0.28.19",
+    "typescript": "^5.7.0",
+    "unstorage": "^1.13.0",
+    "vite": "^6.0.0",
+    "vite-plus": "^0.1.22"
+  },
+  "peerDependencies": {
+    "@libsql/client": "0.15.15",
+    "drizzle-orm": ">=0.44.0 || >=1.0.0-0",
+    "elysia": "^1.0.0 || ^2.0.0-0",
+    "express": "^4.0.0 || ^5.0.0",
+    "hono": "^4.0.0",
+    "mongodb": "^5.0.0 || ^6.0.0",
+    "pg": "^8.0.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0",
+    "redis": "^4.0.0 || ^5.0.0",
+    "unstorage": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@libsql/client": {
+      "optional": true
+    },
+    "drizzle-orm": {
+      "optional": true
+    },
+    "elysia": {
+      "optional": true
+    },
+    "express": {
+      "optional": true
+    },
+    "hono": {
+      "optional": true
+    },
+    "mongodb": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "redis": {
+      "optional": true
+    },
+    "unstorage": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
