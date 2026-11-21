@@ -12,6 +12,7 @@
  * lnk/t/{tenant}/ext/{externalId}      -> link id
  * lnk/t/{tenant}/customers/{id}        -> Customer
  * lnk/t/{tenant}/sales/{invoiceId}     -> sale event id (idempotency)
+ * lnk/t/{tenant}/counters/{id}        -> number (approximate click counter)
  * lnk/t/{tenant}/audit-log             -> AuditEntry[]
  * lnk/clicks/{clickId}                 -> ClickRef (attribution window)
  * lnk/deferred/c/{clickId}             -> DeferredHandoff
@@ -91,3 +92,7 @@ export const deferredFingerprintKey = (fingerprint: string, clickId: string) =>
 /** Last path segment of a key, decoded. */
 export const lastSegment = (key: string): string =>
   decodeURIComponent(key.slice(key.lastIndexOf("/") + 1));
+
+/** Approximate non-bot click counter for a link (kept apart from the link record). */
+export const counterKey = (tenant: string, id: string) =>
+  `${ROOT}/t/${enc(tenant)}/counters/${enc(id)}`;

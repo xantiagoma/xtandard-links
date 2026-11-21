@@ -1,0 +1,8 @@
+/**
+ * Package version. Bumped by the release flow alongside `package.json`.
+ *
+ * @module
+ */
+
+/** The published package version. */
+export const VERSION = "0.0.0";
