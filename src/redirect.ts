@@ -476,6 +476,16 @@ export function createRedirectHandler(options: RedirectHandlerOptions): Redirect
         ...(link.passQuery === false ? {} : { passQuery: query }),
         ...(trackConversions ? { clickId, clickIdParam } : {}),
       });
+      // The web destination (rules applied, no store override) is what a deferred deep link
+      // hands to the app; `destination` is where this visitor is sent right now.
+      const webDestination =
+        target === link.ios || target === link.android
+          ? buildDestination({
+              url: link.url,
+              ...(link.utm ? { utm: link.utm } : {}),
+              ...(trackConversions ? { clickId, clickIdParam } : {}),
+            })
+          : destination;
       if (isPlayStoreUrl(destination)) {
         destination = withInstallReferrer(destination, clickId, clickIdParam);
       }
@@ -536,6 +546,16 @@ export function createRedirectHandler(options: RedirectHandlerOptions): Redirect
                   domain: link.domain,
                   slug: link.slug,
                   at: event.at,
+                  device: event.device,
+                  os: event.os,
+                  browser: event.browser,
+                  referrerHost: event.referrerHost,
+                  qr: event.qr,
+                  ...(event.country ? { country: event.country } : {}),
+                  ...(event.continent ? { continent: event.continent } : {}),
+                  ...(event.city ? { city: event.city } : {}),
+                  ...(event.variant ? { variant: event.variant } : {}),
+                  ...(event.utm ? { utm: event.utm } : {}),
                 }),
               );
             }
@@ -552,7 +572,7 @@ export function createRedirectHandler(options: RedirectHandlerOptions): Redirect
                     tenant: link.tenant,
                     linkId: link.id,
                     path: link.deepLink.path ?? "/",
-                    url: destination,
+                    url: webDestination,
                     os: ua.os,
                     at: event.at,
                     expiresAt: new Date(now + core.deferredTtlMs).toISOString(),
@@ -562,6 +582,8 @@ export function createRedirectHandler(options: RedirectHandlerOptions): Redirect
               );
             }
             await Promise.all(writes);
+            // On edge runtimes timers do not outlive the request: flush counters with it.
+            if (ctx?.waitUntil) await core.flushCounters();
           })(),
         );
       }

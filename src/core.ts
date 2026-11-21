@@ -32,6 +32,7 @@ import {
   DEFAULT_TENANT,
   type Actor,
   type AuditEntry,
+  type ClickDimensions,
   type ClickRef,
   type Customer,
   type DeferredHandoff,
@@ -879,6 +880,26 @@ export function createLinksCore(options: LinksCoreOptions): LinksCore {
     return { customer, ref };
   }
 
+  /** The click's dimensions, copied onto conversion events. */
+  function clickDims(ref: ClickRef): ClickDimensions {
+    const out: ClickDimensions = {};
+    for (const k of [
+      "country",
+      "continent",
+      "city",
+      "device",
+      "os",
+      "browser",
+      "referrerHost",
+      "qr",
+      "variant",
+      "utm",
+    ] as const) {
+      if (ref[k] !== undefined) (out as Record<string, unknown>)[k] = ref[k];
+    }
+    return out;
+  }
+
   async function linkDomainSlug(ref: ClickRef): Promise<{ domain: string; slug: string }> {
     if (ref.domain) return { domain: ref.domain, slug: ref.slug };
     const link = await getLink(ref.tenant, ref.linkId);
@@ -913,6 +934,7 @@ export function createLinksCore(options: LinksCoreOptions): LinksCore {
       slug,
       clickId: bound.customer.clickId,
       customerId: input.customerId,
+      ...clickDims(bound.ref),
       name: input.name ?? "Sign up",
       ...(input.metadata ? { metadata: input.metadata } : {}),
     };
@@ -959,6 +981,7 @@ export function createLinksCore(options: LinksCoreOptions): LinksCore {
       slug,
       clickId: bound.customer.clickId,
       customerId: input.customerId,
+      ...clickDims(bound.ref),
       name: input.name ?? "Purchase",
       amount: Math.round(input.amount),
       currency: (input.currency ?? "USD").toUpperCase(),

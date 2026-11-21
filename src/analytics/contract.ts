@@ -178,7 +178,7 @@ export const NONE_KEY = "(none)";
 
 /**
  * The value of `dimension` on `event` (`"(none)"` when absent). Lead and sale
- * events only carry `link` and `domain`; other dimensions read `"(none)"`.
+ * events carry the dimensions of the click they are attributed to.
  */
 export function dimensionValue(event: AnalyticsEvent, dimension: AnalyticsDimension): string {
   switch (dimension) {
@@ -186,9 +186,6 @@ export function dimensionValue(event: AnalyticsEvent, dimension: AnalyticsDimens
       return event.linkId;
     case "domain":
       return event.domain;
-  }
-  if (event.type !== "click") return NONE_KEY;
-  switch (dimension) {
     case "country":
       return event.country ?? NONE_KEY;
     case "continent":
@@ -196,13 +193,13 @@ export function dimensionValue(event: AnalyticsEvent, dimension: AnalyticsDimens
     case "city":
       return event.city ?? NONE_KEY;
     case "device":
-      return event.device;
+      return event.device ?? NONE_KEY;
     case "os":
-      return event.os;
+      return event.os ?? NONE_KEY;
     case "browser":
-      return event.browser;
+      return event.browser ?? NONE_KEY;
     case "referrer":
-      return event.referrerHost;
+      return event.referrerHost ?? NONE_KEY;
     case "utm_source":
       return event.utm?.source ?? NONE_KEY;
     case "utm_medium":
@@ -210,7 +207,7 @@ export function dimensionValue(event: AnalyticsEvent, dimension: AnalyticsDimens
     case "utm_campaign":
       return event.utm?.campaign ?? NONE_KEY;
     case "qr":
-      return event.qr ? "true" : "false";
+      return event.qr === undefined ? NONE_KEY : event.qr ? "true" : "false";
     case "variant":
       return event.variant ?? NONE_KEY;
   }
