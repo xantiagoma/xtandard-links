@@ -1,6 +1,6 @@
 # Standalone @xtandard/links server: admin panel + redirects on one port.
 # Build context is the repository ROOT: `docker build -f apps/standalone/Dockerfile -t xtandard-links .`
-FROM oven/bun:1.3 AS build
+FROM oven/bun:1.4.4 AS build
 WORKDIR /app
 
 COPY package.json bun.lock ./
@@ -10,7 +10,7 @@ RUN bun install --frozen-lockfile || bun install
 COPY . .
 RUN bun run build:ui
 
-FROM oven/bun:1.3 AS runtime
+FROM oven/bun:1.4.4 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000

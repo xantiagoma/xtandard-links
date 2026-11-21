@@ -29,7 +29,7 @@
  * require a replica set or sharded cluster — they are unavailable on a standalone
  * `mongod`. To keep this adapter usable against any deployment, `watch` is
  * intentionally **not** implemented; the core feature-detects its absence via
- * {@link import("./contract.ts").isWatchable} and falls back to polling.
+ * `isWatchable` and falls back to polling.
  *
  * @module
  */
