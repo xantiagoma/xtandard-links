@@ -14,7 +14,8 @@
  * whole UTC day is inside the range and from hourly buckets at the edges. Query
  * limitations (reported via `capabilities`): no unique visitors, and at most one
  * non-link filter dimension, which cannot be combined with grouping by another
- * dimension (`crossFilter: false`).
+ * dimension (`crossFilter: false`). `deleteLink` drops the link's own rollups
+ * and recent events; tenant-wide totals keep its historical counts.
  *
  * Key layout (under `lnk/rollup/`):
  *

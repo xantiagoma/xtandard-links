@@ -184,6 +184,9 @@ function defaultPage(p: RedirectPage): Response {
 
 const PASSWORD_COOKIE = "xl_pw_";
 
+/** Path (on a short domain, under `basePath`) of the deferred deep-link claim endpoint. */
+export const DEFERRED_CLAIM_PATH = "/_links/deferred/claim";
+
 function readCookie(request: Request, name: string): string | undefined {
   const header = request.headers.get("cookie");
   if (!header) return undefined;
@@ -292,6 +295,49 @@ export function createRedirectHandler(options: RedirectHandlerOptions): Redirect
     }
   }
 
+  /**
+   * `POST /_links/deferred/claim` — the app's first-open call (ADR 0008). Body
+   * `{ clickId? }`: exact match by click id (install referrer / pasteboard),
+   * otherwise a probabilistic match on the request's fingerprint.
+   */
+  async function claimDeferred(request: Request): Promise<Response> {
+    const json = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+      });
+    let clickId: string | undefined;
+    try {
+      const text = await request.text();
+      const body = text ? (JSON.parse(text) as { clickId?: unknown }) : {};
+      if (typeof body.clickId === "string" && body.clickId) clickId = body.clickId;
+    } catch {
+      return json({ error: "invalid JSON body" }, 400);
+    }
+    const ua = parseUa(request.headers.get("user-agent") ?? "");
+    const fingerprint = clickId
+      ? undefined
+      : await deferredFingerprint({
+          ip: getIp(request),
+          os: ua.os,
+          salt: dailySalt(privacy.salt, core.now()),
+        });
+    const claimed = await core.claimDeferred({
+      ...(clickId ? { clickId } : {}),
+      ...(fingerprint ? { fingerprint } : {}),
+    });
+    if (!claimed) return json({ matched: false }, 404);
+    const { handoff, matchType } = claimed;
+    return json({
+      matched: true,
+      matchType,
+      clickId: handoff.clickId,
+      linkId: handoff.linkId,
+      path: handoff.path,
+      url: handoff.url,
+    });
+  }
+
   async function handle(request: Request, ctx?: RedirectContext): Promise<Response | null> {
     let resolvedLink: Link | null = null;
     try {
@@ -313,6 +359,10 @@ export function createRedirectHandler(options: RedirectHandlerOptions): Redirect
 
       const lookupHost = domain?.hostname ?? (basePath ? defaultDomain : undefined);
       if (!lookupHost) return null; // not one of our hosts
+
+      if (pathname === DEFERRED_CLAIM_PATH) {
+        return method === "POST" ? claimDeferred(request) : null;
+      }
       const lookupDomain = domain ?? (lookupHost ? await resolver.domain(lookupHost) : null);
 
       let slug: string;

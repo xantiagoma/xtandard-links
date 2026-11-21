@@ -395,3 +395,38 @@ describe("redirect handler", () => {
     expect(tapped).toEqual(["t"]);
   });
 });
+
+describe("deferred claim endpoint", () => {
+  test("exact by click id, probabilistic by fingerprint, once", async () => {
+    const { core, redirects, flush, events } = createTestLinks();
+    await core.createLink({
+      url: "https://example.com",
+      slug: "dl",
+      deepLink: { path: "/p/1", deferred: true },
+    });
+    await redirects.fetch(
+      clickRequest("https://sho.rt/dl", { userAgent: USER_AGENTS.android, ip: "198.51.100.5" }),
+    );
+    await redirects.fetch(
+      clickRequest("https://sho.rt/dl", { userAgent: USER_AGENTS.iphone, ip: "198.51.100.6" }),
+    );
+    await flush();
+    const androidClick = clicks(events).find((c) => c.os === "android")?.id;
+    const claim = (body: unknown, ua: string = USER_AGENTS.iphone, ip = "198.51.100.6") =>
+      redirects.fetch(
+        clickRequest("https://sho.rt/_links/deferred/claim", {
+          method: "POST",
+          body: JSON.stringify(body),
+          userAgent: ua,
+          ip,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    const exact = await claim({ clickId: androidClick });
+    expect(await exact.json()).toMatchObject({ matched: true, matchType: "exact", path: "/p/1" });
+    const fuzzy = await claim({});
+    expect(await fuzzy.json()).toMatchObject({ matched: true, matchType: "probabilistic" });
+    expect((await claim({})).status).toBe(404);
+    expect((await claim("{")).status).toBe(404);
+  });
+});
