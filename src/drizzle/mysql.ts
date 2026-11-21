@@ -5,6 +5,11 @@
  * Base columns: `key varchar … COLLATE utf8mb4_bin PRIMARY KEY` (length configurable), `value json
  * NOT NULL`. `extraColumns`/`extraIndexes` mirror `drizzle-audit`.
  *
+ * The `key` column uses the **`utf8mb4_bin`** collation: MySQL's default
+ * (`utf8mb4_0900_ai_ci`) is case- and accent-insensitive, so keys such as
+ * `lnk/t/Acme/…` and `lnk/t/acme/…` would be the same primary key. New tables
+ * can opt into a NO PAD collation with `keyCollation` (docs/STORAGE.md).
+ *
  * @example
  * ```ts
  * import { mysqlLinksTable } from "@xtandard/links/drizzle/mysql";
@@ -14,59 +19,27 @@
  * @module
  */
 
-import type { BuildColumns } from "drizzle-orm";
-import {
-  json,
-  mysqlTable,
-  customType,
-  type MySqlColumnBuilderBase,
-  type MySqlTableExtraConfigValue,
-} from "drizzle-orm/mysql-core";
-import type { DrizzleKvTable } from "./table.ts";
+import { mysqlKvTable, type MysqlKvTableOptions } from "@xtandard/kit/drizzle/mysql";
+import type { DrizzleKvTable } from "@xtandard/kit/drizzle/mysql";
 
-export type { DrizzleKvTable } from "./table.ts";
+export type { DrizzleKvTable } from "@xtandard/kit/drizzle/mysql";
 
-/** The `self` passed to an {@link MysqlLinksTableOptions.extraIndexes} callback. */
-type MysqlLinksColumns = BuildColumns<string, Record<string, MySqlColumnBuilderBase>, "mysql">;
-
-/** Options for {@link mysqlLinksTable}. */
-export interface MysqlLinksTableOptions {
-  /**
-   * `varchar` length for the `key` primary key. Default `512` (store keys are
-   * short slash-delimited paths). Keep within your InnoDB index-prefix limit.
-   */
-  keyLength?: number;
-  /** Additional columns merged into the table. */
-  extraColumns?: () => Record<string, MySqlColumnBuilderBase>;
-  /** Additional indexes/constraints; receives the built table for column references. */
-  extraIndexes?: (table: MysqlLinksColumns) => MySqlTableExtraConfigValue[];
-}
-
-/** `varchar(n) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin` — exact, case-sensitive keys. */
-const binaryVarchar = (name: string, config: { length: number }) =>
-  customType<{ data: string; driverData: string }>({
-    dataType: () => `varchar(${config.length}) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`,
-  })(name);
+/**
+ * Options for {@link mysqlLinksTable}: `keyLength` (default `512`; keep within
+ * your InnoDB index-prefix limit), `keyCollation` (default `utf8mb4_bin`; opt
+ * into `utf8mb4_0900_bin` / `utf8mb4_nopad_bin` for new tables),
+ * `extraColumns` and `extraIndexes`.
+ */
+export type MysqlLinksTableOptions = MysqlKvTableOptions;
 
 /**
  * Build the MySQL `mysqlTable` for the links KV store: `key varchar PRIMARY
- * KEY`, `value json NOT NULL`. The table name defaults to `"xtandard_links_kv"`.
+ * KEY` (`utf8mb4_bin`), `value json NOT NULL`. The table name defaults to
+ * `"xtandard_links_kv"`.
  */
 export function mysqlLinksTable(
   name = "xtandard_links_kv",
   opts?: MysqlLinksTableOptions,
 ): DrizzleKvTable {
-  const columns = {
-    // Binary collation: MySQL's default (utf8mb4_0900_ai_ci) is case- and accent-insensitive,
-    // which would merge keys such as `lnk/t/Acme/…` and `lnk/t/acme/…`.
-    key: binaryVarchar("key", { length: opts?.keyLength ?? 512 }).primaryKey(),
-    value: json("value").notNull(),
-    ...opts?.extraColumns?.(),
-  };
-  // Cast to the exact `self` type Drizzle infers from `columns` — the public
-  // `extraIndexes` type uses a generic column map, which is a supertype.
-  const extraConfig = opts?.extraIndexes as
-    | ((self: BuildColumns<string, typeof columns, "mysql">) => MySqlTableExtraConfigValue[])
-    | undefined;
-  return mysqlTable(name, columns, extraConfig);
+  return mysqlKvTable(name, opts);
 }

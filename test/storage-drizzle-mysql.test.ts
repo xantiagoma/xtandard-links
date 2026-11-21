@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import { getTableConfig, type MySqlTable } from "drizzle-orm/mysql-core";
 import mysql from "mysql2/promise";
-import { afterAll, describe, vi } from "vitest";
+import { afterAll, describe, expect, test, vi } from "vitest";
 import { mysqlLinksTable } from "../src/drizzle/mysql.ts";
 import { createDrizzleStorage } from "../src/storage/drizzle.ts";
 import { runStorageContractTests } from "./storage-contract.ts";
@@ -51,13 +51,21 @@ function createTableSql(table: MySqlTable): string {
 
 let n = 0;
 describe.skipIf(!available)("drizzle mysql (live)", () => {
-  runStorageContractTests("drizzle (mysql2)", async () => {
-    const p = await getPool();
-    const table = mysqlLinksTable(`kv_${n++}`);
-    await p.query(createTableSql(table as unknown as MySqlTable));
-    // mysql2/promise and mysql2 ship separate Pool typings; the runtime object is the same.
-    return createDrizzleStorage({ db: drizzle(p as never), table });
-  });
+  runStorageContractTests(
+    "drizzle (mysql2)",
+    async () => {
+      const p = await getPool();
+      const table = mysqlLinksTable(`kv_${n++}`);
+      await p.query(createTableSql(table as unknown as MySqlTable));
+      // mysql2/promise and mysql2 ship separate Pool typings; the runtime object is the same.
+      return createDrizzleStorage({ db: drizzle(p as never), table });
+    },
+    {
+      t: { describe, test, expect },
+      capabilities: { compareAndSwap: true, watch: false },
+      timeout: 30_000,
+    },
+  );
 });
 
 afterAll(async () => {

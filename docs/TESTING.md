@@ -92,7 +92,7 @@ Tests that need a server skip unless its variable is set:
 | Variable                                                                             | Enables                                          |
 | ------------------------------------------------------------------------------------ | ------------------------------------------------ |
 | `REDIS_URL`                                                                          | Redis storage (live conformance, keyspace watch) |
-| `REDIS_STACK_URL`                                                                    | RedisJSON storage (needs the JSON module)        |
+| `REDIS_JSON_URL`                                                                     | RedisJSON storage (needs the JSON module)        |
 | `POSTGRES_URL`                                                                       | Postgres storage against a real server           |
 | `MONGO_URL`                                                                          | MongoDB storage                                  |
 | `MYSQL_URL`                                                                          | Drizzle over MySQL                               |

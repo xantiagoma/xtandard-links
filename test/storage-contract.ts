@@ -1,118 +1,46 @@
 /**
- * Reusable conformance suite for the {@link LinksStorage} contract. Storage
- * adapters run the same battery of behavioural tests against their
- * implementation by calling {@link runStorageContractTests}.
+ * Storage conformance for the links drivers: the shared
+ * `@xtandard/kit/storage/testing` suite (run with the `lnk` key root), plus the
+ * links key-layout cases (URI-encoded slugs and tenants).
  *
  * This file deliberately omits the `.test.ts` suffix so vitest does not pick it
- * up as a standalone suite — it only runs when imported by an adapter's test.
+ * up as a standalone suite — it only runs when imported by an adapter's test,
+ * which injects its runner (`vitest` or `bun:test`).
  *
  * @module
  */
 
-import { describe, expect, test } from "vitest";
-import { linkKey, linksPrefix, slugKey } from "../src/keys.ts";
 import {
-  isCompareAndSwap,
-  isWatchable,
-  type LinksStorage,
-  type StorageChangeEvent,
-} from "../src/storage/contract.ts";
+  runConformanceCases,
+  runStorageConformance,
+  type ConformanceCapabilities,
+  type ConformanceCase,
+  type ConformanceTestApi,
+  type SeedLegacy,
+} from "@xtandard/kit/storage/testing";
+import { linkKey, linksPrefix, ROOT, slugKey } from "../src/keys.ts";
+import type { LinksStorage } from "../src/storage/contract.ts";
 
 /** A factory producing a fresh, empty storage for each test. */
 export type MakeStorage = () => Promise<LinksStorage> | LinksStorage;
 
-/** Optional capabilities a backend opts into testing. */
+/** What a backend opts into. */
 export interface StorageContractOptions {
-  /** Run compare-and-swap semantics (requires `compareAndSwap`). */
-  compareAndSwap?: boolean;
-  /** Run watch semantics (requires `watch`). Delay (ms) to wait for notifications. */
-  watch?: boolean | { settleMs: number };
+  /** The injected test API (`{ describe, test, expect }` from vitest or bun:test). */
+  t: ConformanceTestApi;
+  /** Capabilities for the kit suite — declare every one (`false` for what the driver lacks). */
+  capabilities: ConformanceCapabilities;
+  /** Write a non-canonical stored form directly (the kit's legacy-CAS case). */
+  seedLegacy?: SeedLegacy;
+  /** Per-test timeout (live backends). */
+  timeout?: number;
 }
 
-const settle = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/**
- * Register a `describe(name, …)` block exercising the full {@link LinksStorage}
- * contract, plus opt-in capability semantics.
- */
-export function runStorageContractTests(
-  name: string,
-  makeStorage: MakeStorage,
-  options: StorageContractOptions = {},
-): void {
-  describe(`LinksStorage contract: ${name}`, () => {
-    test("returns null for a missing key", async () => {
-      const storage = await makeStorage();
-      expect(await storage.getItem("lnk/t/acme/missing")).toBeNull();
-    });
-
-    test("round-trips an object value", async () => {
-      const storage = await makeStorage();
-      const value = { url: "https://x.example/a?b=1", tags: ["a", "b"], nested: { x: 1, y: null } };
-      await storage.setItem(linkKey("acme", "lnk_1"), value);
-      expect(await storage.getItem(linkKey("acme", "lnk_1"))).toEqual(value);
-    });
-
-    test("round-trips primitive values", async () => {
-      const storage = await makeStorage();
-      await storage.setItem("lnk/t/acme/ext/x", "lnk_1");
-      expect(await storage.getItem("lnk/t/acme/ext/x")).toBe("lnk_1");
-      await storage.setItem("lnk/n", 42);
-      expect(await storage.getItem("lnk/n")).toBe(42);
-    });
-
-    test("round-trips arrays", async () => {
-      const storage = await makeStorage();
-      await storage.setItem("lnk/tenants", ["a", "b"]);
-      expect(await storage.getItem("lnk/tenants")).toEqual(["a", "b"]);
-    });
-
-    test("overwrites an existing key", async () => {
-      const storage = await makeStorage();
-      await storage.setItem("lnk/t/acme/k", { v: 1 });
-      await storage.setItem("lnk/t/acme/k", { v: 2 });
-      expect(await storage.getItem("lnk/t/acme/k")).toEqual({ v: 2 });
-    });
-
-    test("removeItem deletes a key", async () => {
-      const storage = await makeStorage();
-      await storage.setItem("lnk/t/acme/k", { v: 1 });
-      await storage.removeItem("lnk/t/acme/k");
-      expect(await storage.getItem("lnk/t/acme/k")).toBeNull();
-    });
-
-    test("removeItem on a missing key is a no-op", async () => {
-      const storage = await makeStorage();
-      await expect(storage.removeItem("lnk/t/acme/nope")).resolves.toBeUndefined();
-    });
-
-    test("getKeys returns nested keys under a prefix", async () => {
-      const storage = await makeStorage();
-      await storage.setItem(linkKey("acme", "lnk_1"), { v: 1 });
-      await storage.setItem(linkKey("acme", "lnk_2"), { v: 2 });
-      await storage.setItem("lnk/t/acme/meta", { key: "acme" });
-      const keys = await storage.getKeys("lnk/t/acme/");
-      expect(keys.sort()).toEqual(
-        [linkKey("acme", "lnk_1"), linkKey("acme", "lnk_2"), "lnk/t/acme/meta"].sort(),
-      );
-    });
-
-    test("getKeys isolates by prefix (no sibling-prefix bleed)", async () => {
-      const storage = await makeStorage();
-      await storage.setItem("lnk/t/app1/a", { v: 1 });
-      await storage.setItem("lnk/t/app10/b", { v: 2 });
-      expect(await storage.getKeys("lnk/t/app1/")).toEqual(["lnk/t/app1/a"]);
-      expect(await storage.getKeys("lnk/t/app10/")).toEqual(["lnk/t/app10/b"]);
-    });
-
-    test("getKeys returns an empty array when nothing matches", async () => {
-      const storage = await makeStorage();
-      await storage.setItem("lnk/t/acme/a", { v: 1 });
-      expect(await storage.getKeys("lnk/t/other/")).toEqual([]);
-    });
-
-    test("keys with encoded characters (nested slugs, unicode) round-trip and list", async () => {
-      const storage = await makeStorage();
+/** The links key layout on any backend. */
+export const keyLayoutCases: ConformanceCase[] = [
+  {
+    name: "slug keys with encoded characters (nested slugs, unicode) round-trip and list",
+    async run({ storage, expect }) {
       const k1 = slugKey("go.acme.com", "docs/intro");
       const k2 = slugKey("go.acme.com", "café-50%");
       await storage.setItem(k1, { tenant: "acme", id: "lnk_1" });
@@ -120,40 +48,11 @@ export function runStorageContractTests(
       expect(await storage.getItem(k1)).toEqual({ tenant: "acme", id: "lnk_1" });
       expect(await storage.getItem(k2)).toEqual({ tenant: "acme", id: "lnk_2" });
       expect((await storage.getKeys("lnk/s/go.acme.com/")).sort()).toEqual([k1, k2].sort());
-    });
-
-    test("keys are case-sensitive (no collation folding)", async () => {
-      const storage = await makeStorage();
-      await storage.setItem("lnk/t/Acme/links/lnk_1", { v: "upper" });
-      await storage.setItem("lnk/t/acme/links/lnk_1", { v: "lower" });
-      await storage.setItem("lnk/t/acmé/links/lnk_1", { v: "accent" });
-      expect(await storage.getItem("lnk/t/Acme/links/lnk_1")).toEqual({ v: "upper" });
-      expect(await storage.getItem("lnk/t/acme/links/lnk_1")).toEqual({ v: "lower" });
-      expect(await storage.getItem("lnk/t/acmé/links/lnk_1")).toEqual({ v: "accent" });
-      expect(await storage.getKeys("lnk/t/Acme/")).toEqual(["lnk/t/Acme/links/lnk_1"]);
-      expect(await storage.getKeys("lnk/t/acme/")).toEqual(["lnk/t/acme/links/lnk_1"]);
-      await storage.removeItem("lnk/t/ACME/links/lnk_1");
-      expect(await storage.getItem("lnk/t/Acme/links/lnk_1")).toEqual({ v: "upper" });
-    });
-
-    test("keys and prefixes with metacharacters round-trip literally", async () => {
-      const storage = await makeStorage();
-      // LIKE (% _ ! \\), GLOB (* ? [ ]) and unstorage-normalized (? \\ :) characters.
-      const specials = ["%", "_", "!", "\\", "*", "?", "[", "]", ":", "%25"];
-      const keys = specials.map((c) => `lnk/x${c}y/a`);
-      keys.push("lnk/xzy/a", "lnk/xay/a", "lnk/x/y/a", "lnk/x:y/b");
-      for (const k of keys) await storage.setItem(k, { k });
-      for (const k of keys) expect(await storage.getItem(k)).toEqual({ k });
-      for (const c of specials) {
-        expect((await storage.getKeys(`lnk/x${c}y/`)).sort()).toEqual(
-          keys.filter((k) => k.startsWith(`lnk/x${c}y/`)).sort(),
-        );
-      }
-      expect((await storage.getKeys("lnk/x")).length).toBe(keys.length);
-    });
-
-    test("case-distinct tenants do not collide", async () => {
-      const storage = await makeStorage();
+    },
+  },
+  {
+    name: "case-distinct tenants do not collide",
+    async run({ storage, expect }) {
       for (const t of ["Acme", "acme", "ACME"]) {
         await storage.setItem(linkKey(t, "lnk_1"), { t });
         await storage.setItem(`lnk/tenants/${t}`, t);
@@ -167,83 +66,24 @@ export function runStorageContractTests(
         "lnk/tenants/Acme",
         "lnk/tenants/acme",
       ]);
-    });
+    },
+  },
+];
 
-    test("lists many keys", async () => {
-      const storage = await makeStorage();
-      for (let i = 0; i < 120; i++) {
-        await storage.setItem(linkKey("bulk", `lnk_${String(i).padStart(3, "0")}`), { i });
-      }
-      expect((await storage.getKeys(linksPrefix("bulk"))).length).toBe(120);
-    });
+/**
+ * Run the kit conformance suite (key root `lnk`) against a links driver, plus
+ * the links key-layout cases.
+ */
+export function runStorageContractTests(
+  name: string,
+  makeStorage: MakeStorage,
+  options: StorageContractOptions,
+): void {
+  const shared = { t: options.t, keyRoot: ROOT, timeout: options.timeout };
+  runStorageConformance(name, makeStorage, {
+    ...shared,
+    capabilities: options.capabilities,
+    seedLegacy: options.seedLegacy,
   });
-
-  if (options.compareAndSwap) {
-    describe(`CompareAndSwap semantics: ${name}`, () => {
-      test("claims an absent key with expected null, once", async () => {
-        const storage = await makeStorage();
-        if (!isCompareAndSwap(storage)) throw new Error("expected compareAndSwap capability");
-        const key = slugKey("go.acme.com", "sale");
-        expect(
-          await storage.compareAndSwap({ key, expected: null, next: { tenant: "a", id: "1" } }),
-        ).toBe(true);
-        expect(
-          await storage.compareAndSwap({ key, expected: null, next: { tenant: "b", id: "2" } }),
-        ).toBe(false);
-        expect(await storage.getItem(key)).toEqual({ tenant: "a", id: "1" });
-      });
-
-      test("swaps only when the current value equals expected", async () => {
-        const storage = await makeStorage();
-        if (!isCompareAndSwap(storage)) throw new Error("expected compareAndSwap capability");
-        await storage.setItem("lnk/cas", { n: 1, tags: ["a"] });
-        expect(
-          await storage.compareAndSwap({ key: "lnk/cas", expected: { n: 2 }, next: { n: 3 } }),
-        ).toBe(false);
-        expect(
-          await storage.compareAndSwap({
-            key: "lnk/cas",
-            expected: { n: 1, tags: ["a"] },
-            next: { n: 2, tags: ["a"] },
-          }),
-        ).toBe(true);
-        expect(await storage.getItem("lnk/cas")).toEqual({ n: 2, tags: ["a"] });
-      });
-
-      test("concurrent claims of one key: exactly one wins", async () => {
-        const storage = await makeStorage();
-        if (!isCompareAndSwap(storage)) throw new Error("expected compareAndSwap capability");
-        const key = slugKey("go.acme.com", "race");
-        const results = await Promise.all(
-          Array.from({ length: 8 }, (_, i) =>
-            storage.compareAndSwap({ key, expected: null, next: { tenant: "t", id: `l${i}` } }),
-          ),
-        );
-        expect(results.filter(Boolean).length).toBe(1);
-      });
-    });
-  }
-
-  if (options.watch) {
-    const settleMs = typeof options.watch === "object" ? options.watch.settleMs : 50;
-    describe(`Watch semantics: ${name}`, () => {
-      test("notifies updates and removals under the prefix only", async () => {
-        const storage = await makeStorage();
-        if (!isWatchable(storage)) throw new Error("expected watch capability");
-        const events: StorageChangeEvent[] = [];
-        const off = await storage.watch("lnk/s/", (e) => events.push(e));
-        await settle(settleMs);
-        const key = slugKey("go.acme.com", "w");
-        await storage.setItem(key, { tenant: "t", id: "1" });
-        await storage.setItem("lnk/t/x/meta", { key: "x" });
-        await settle(settleMs); // filesystem watchers coalesce a create immediately followed by a delete
-        await storage.removeItem(key);
-        await settle(settleMs);
-        off();
-        expect(events.some((e) => e.type === "update" && e.key === key)).toBe(true);
-        expect(events.some((e) => e.type === "remove" && e.key === key)).toBe(true);
-        expect(events.every((e) => e.key.startsWith("lnk/s/"))).toBe(true);
-      });
-    });
-  }
+  runConformanceCases(`links key layout: ${name}`, keyLayoutCases, makeStorage, shared);
 }

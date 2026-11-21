@@ -7,9 +7,9 @@
  * `bun:sqlite` (single-file, Bun-only) does not.
  *
  * Pass either a pre-constructed `client`, or `url` (+ optional `authToken`) to let
- * the adapter construct one lazily on first use. An optional `prefix` is **not**
- * used here — keys are stored verbatim as the primary key; namespace via a
- * distinct `table` or a separate database instead.
+ * the adapter construct one lazily on first use. Keys are stored verbatim as the
+ * primary key; namespace via a distinct `table` (default `"xtandard_links_kv"`)
+ * or a separate database instead. The driver is `@xtandard/kit/storage/libsql`.
  *
  * ```ts
  * import { createLibsqlStorage } from "@xtandard/links/storage/libsql";
@@ -26,56 +26,25 @@
  *
  * Implements {@link CompareAndSwapLinksStorage} with single conditional
  * statements (no interactive transaction, so it works over Turso's HTTP
- * protocol too): claiming an absent key is `INSERT … ON CONFLICT DO NOTHING
- * RETURNING key`; a swap reads the stored JSON text, deep-compares it with
- * `expected`, then `UPDATE … WHERE key = ? AND value = <the text it read>` —
- * which only lands if nobody wrote in between.
+ * protocol too).
  *
  * @module
  */
 
-import { requirePeer } from "./contract.ts";
-import type { CompareAndSwapLinksStorage } from "./contract.ts";
-import { deepEqual } from "./memory.ts";
+import * as kit from "@xtandard/kit/storage/libsql";
 
-/** Options for {@link createLibsqlStorage}. */
-export interface LibsqlStorageOptions {
-  /** libSQL connection URL (`libsql://…`, `https://…`, `file:…`, `:memory:`). Used when no `client`. */
-  url?: string;
-  /** Turso auth token for remote databases. */
-  authToken?: string;
-  /** A pre-constructed `@libsql/client` client to use instead of connecting. */
-  client?: LibsqlClientLike;
-  /** Table name (default `"xtandard_links_kv"`). Validated as a safe identifier. */
-  table?: string;
-}
+export type { LibsqlClientLike } from "@xtandard/kit/storage/libsql";
 
-/** A {@link CompareAndSwapLinksStorage} backed by libSQL/Turso, plus `close()`. */
-export interface LibsqlLinksStorage extends CompareAndSwapLinksStorage {
-  /** Close the client if this adapter created it; no-op for a borrowed instance. */
-  close(): void;
-}
+/** Options for {@link createLibsqlStorage}. `table` defaults to `"xtandard_links_kv"`. */
+export type LibsqlStorageOptions = kit.LibsqlStorageOptions;
 
-/** Minimal structural view of the `@libsql/client` surface this adapter uses. */
-export interface LibsqlClientLike {
-  execute(
-    stmt: string | { sql: string; args: unknown[] },
-  ): Promise<{ rows: Array<Record<string, unknown>> }>;
-  close(): void;
-}
-
-const escapeLike = (prefix: string): string => prefix.replace(/[\\%_]/g, (c) => `\\${c}`);
-
-/**
- * How many times a swap re-reads after losing a race to a write that left the
- * value deep-equal to `expected` (e.g. re-serialized identically). Each retry
- * means another writer made progress, so this only bounds pathological churn.
- */
-const CAS_RETRIES = 16;
+/** A compare-and-swap capable {@link LinksStorage} backed by libSQL/Turso, plus `close()`. */
+export type LibsqlLinksStorage = kit.LibsqlKvStorage;
 
 /**
  * Create a libSQL/Turso-backed {@link LibsqlLinksStorage}. The table is created
- * on first use; connection (when constructed from `url`) is lazy and shared.
+ * on first use (a failed DDL is retried on the next call); connection (when
+ * constructed from `url`) is lazy and shared.
  *
  * @example
  * ```ts
@@ -89,112 +58,9 @@ const CAS_RETRIES = 16;
  * ```
  */
 export function createLibsqlStorage(options: LibsqlStorageOptions): LibsqlLinksStorage {
-  const table = options.table ?? "xtandard_links_kv";
-  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(table)) {
-    throw new Error(`Invalid table name: ${JSON.stringify(table)}`);
-  }
-
-  const ownsClient = !options.client;
-  let client: LibsqlClientLike | undefined = options.client;
-  let ready: Promise<LibsqlClientLike> | undefined;
-
-  /** Resolve a connected client and ensure the table exists (once). */
-  function getClient(): Promise<LibsqlClientLike> {
-    ready ??= (async () => {
-      if (!client) {
-        if (!options.url) {
-          throw new Error("createLibsqlStorage requires either a `client` or a `url`");
-        }
-        let createClient: (opts: { url: string; authToken?: string }) => LibsqlClientLike;
-        try {
-          // Non-literal specifier so the type-checker doesn't require the optional
-          // peer to be installed at build time (it's resolved at runtime only).
-          const specifier: string = "@libsql/client";
-          ({ createClient } = (await import(specifier)) as {
-            createClient: (opts: { url: string; authToken?: string }) => LibsqlClientLike;
-          });
-        } catch (error) {
-          if (
-            (error as { code?: string }).code === "ERR_MODULE_NOT_FOUND" ||
-            /Cannot find (module|package)/.test(String(error))
-          ) {
-            requirePeer("@libsql/client", "storage/libsql");
-          }
-          throw error;
-        }
-        client = createClient({ url: options.url, authToken: options.authToken });
-      }
-      await client.execute(
-        `CREATE TABLE IF NOT EXISTS ${table} (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
-      );
-      return client;
-    })();
-    return ready;
-  }
-
-  return {
-    async getItem<T>(key: string): Promise<T | null> {
-      const c = await getClient();
-      const { rows } = await c.execute({
-        sql: `SELECT value FROM ${table} WHERE key = ?`,
-        args: [key],
-      });
-      const value = rows[0]?.value;
-      return typeof value === "string" ? (JSON.parse(value) as T) : null;
-    },
-
-    async setItem<T>(key: string, value: T): Promise<void> {
-      const c = await getClient();
-      await c.execute({
-        sql: `INSERT INTO ${table} (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-        args: [key, JSON.stringify(value)],
-      });
-    },
-
-    async removeItem(key: string): Promise<void> {
-      const c = await getClient();
-      await c.execute({ sql: `DELETE FROM ${table} WHERE key = ?`, args: [key] });
-    },
-
-    async getKeys(prefix: string): Promise<string[]> {
-      const c = await getClient();
-      const { rows } = await c.execute({
-        sql: `SELECT key FROM ${table} WHERE key LIKE ? ESCAPE '\\'`,
-        args: [`${escapeLike(prefix)}%`],
-      });
-      // SQLite's LIKE folds ASCII case: keep only exact (case-sensitive) prefix matches.
-      return rows.map((r) => String(r.key)).filter((key) => key.startsWith(prefix));
-    },
-
-    async compareAndSwap<T>(input: { key: string; expected: T | null; next: T }): Promise<boolean> {
-      const c = await getClient();
-      const next = JSON.stringify(input.next);
-      if (input.expected === null) {
-        const { rows } = await c.execute({
-          sql: `INSERT INTO ${table} (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING RETURNING key`,
-          args: [input.key, next],
-        });
-        return rows.length === 1;
-      }
-      for (let attempt = 0; attempt < CAS_RETRIES; attempt++) {
-        const { rows } = await c.execute({
-          sql: `SELECT value FROM ${table} WHERE key = ?`,
-          args: [input.key],
-        });
-        const raw = rows[0]?.value;
-        if (typeof raw !== "string") return false;
-        if (!deepEqual(JSON.parse(raw), input.expected)) return false;
-        const updated = await c.execute({
-          sql: `UPDATE ${table} SET value = ? WHERE key = ? AND value = ? RETURNING key`,
-          args: [next, input.key, raw],
-        });
-        if (updated.rows.length === 1) return true;
-      }
-      return false;
-    },
-
-    close(): void {
-      if (ownsClient) client?.close();
-    },
-  } satisfies LibsqlLinksStorage;
+  return kit.createLibsqlStorage({
+    subpath: "@xtandard/links/storage/libsql",
+    ...options,
+    table: options.table ?? "xtandard_links_kv",
+  });
 }
