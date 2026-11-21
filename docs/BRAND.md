@@ -8,8 +8,8 @@ near-black rounded tile between faint `< >` brackets with orbit lines, like
 **lime**; the chain is what makes it links.
 
 Everything lives in [`docs/assets/`](assets/). The SVGs are the masters and are themselves generated
-from the geometry in [`scripts/brand/`](../scripts/brand/); every PNG and ICO is rendered from the
-masters. Rebuild after any change:
+from the geometry in [`scripts/brand/`](../scripts/brand/); the three rasters (social card, favicon
+ICO, Apple touch icon) are rendered from them. Rebuild after any change:
 
 ```sh
 sh scripts/brand-assets.sh          # masters + rasters + the copies in site/public and src/ui/public
@@ -21,29 +21,36 @@ It needs `uv` (fonttools + uharfbuzz for the wordmark outlines), `rsvg-convert` 
 
 ## Files
 
-| File                                                                  | What it is                                                                                  | Use it for                                                                                                                          |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `logo.svg`                                                            | App icon: the mark on the near-black tile with brackets, orbit lines and a soft shadow      | The master for every square raster                                                                                                  |
-| `logo.png` (1024), `logo-256.png`, `logo-128.png`                     | App icon rasters                                                                            | README/npm header (`logo-128.png`, or `logo-256.png` at `width="128"`), avatars, the GitHub repository picture, the GHCR image logo |
-| `symbol.svg`, `symbol.png` (256 high)                                 | The X + chain alone, transparent                                                            | Inline UI (the admin navbar), places that draw their own surface                                                                    |
-| `lockup-horizontal-dark.svg` / `.png` (2×)                            | Symbol + wordmark, `xtandard-` in near-white                                                | Headers on dark backgrounds (README in GitHub dark mode, the docs site in dark mode)                                                |
-| `lockup-horizontal-light.svg` / `.png` (2×)                           | Symbol (deeper lime) + wordmark, `xtandard-` in ink                                         | Headers on light backgrounds (README in light mode, npm, the docs site)                                                             |
-| `lockup-stacked-{dark,light}.svg` / `.png` (2×)                       | Symbol left, `xtandard-` over `links`                                                       | Square-ish slots: slides, sidebars, stickers                                                                                        |
-| `monochrome-white.svg`, `monochrome-black.svg`                        | One-colour horizontal lockup                                                                | Photos and busy backgrounds (white); one-colour print (black)                                                                       |
-| `favicon.svg`, `favicon.ico` (16/32/48), `apple-touch-icon.png` (180) | The tile + mark without orbit, brackets and shadow, with a bolder chain that survives 16 px | Browser tabs: the docs site and the admin UI                                                                                        |
-| `social.svg`, `social.png` (1280×640)                                 | Social card: icon, wordmark, tagline, `bun add` line                                        | The GitHub social preview (Settings → General → Social preview, uploaded by hand) and the docs site's `og:image`                    |
+Every logo, symbol and lockup that appears on a page is an **SVG** (crisp at any size, light and
+dark variants). Rasters exist only where a format requires one and nobody sees them as an on-page
+logo: the social card and the `<head>` icon fallbacks.
+
+| File                                                   | What it is                                                                                  | Use it for                                                                               |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `logo.svg`                                             | App icon: the mark on the near-black tile with brackets, orbit lines and a soft shadow      | The docs-site hero; anywhere a square icon is shown (render the SVG)                     |
+| `symbol.svg`                                           | The X + chain alone, transparent                                                            | Inline UI (the admin navbar, inlined by `BrandMark`), places that draw their own surface |
+| `lockup-horizontal-dark.svg`                           | Symbol + wordmark, `xtandard-` in near-white                                                | Headers on dark backgrounds (README in GitHub dark mode, the docs site in dark mode)     |
+| `lockup-horizontal-light.svg`                          | Symbol (deeper lime) + wordmark, `xtandard-` in ink                                         | Headers on light backgrounds (README in light mode, npm, the docs site)                  |
+| `lockup-stacked-{dark,light}.svg`                      | Symbol left, `xtandard-` over `links`                                                       | Square-ish slots: slides, sidebars, stickers                                             |
+| `monochrome-white.svg`, `monochrome-black.svg`         | One-colour horizontal lockup                                                                | Photos and busy backgrounds (white); one-colour print (black)                            |
+| `favicon.svg`                                          | The tile + mark without orbit, brackets and shadow, with a bolder chain that survives 16 px | Browser tabs (the primary icon)                                                          |
+| `favicon.ico` (16/32/48), `apple-touch-icon.png` (180) | Raster fallbacks of the favicon / icon                                                      | `<head>` only: browsers without SVG favicons, iOS home screens                           |
+| `social.svg` → `social.png` (1280×640)                 | Social card: icon, wordmark, tagline, `bun add` line                                        | `og:image`/`twitter:image` (must be raster) and the GitHub social preview                |
 
 ### Where each file goes
 
-- **README header**: a `<picture>` choosing `lockup-horizontal-dark.png` / `-light.png` with
+- **README header**: a `<picture>` choosing `lockup-horizontal-dark.svg` / `-light.svg` with
   `prefers-color-scheme`. The README ships to npm, which does not ship `docs/`, so the header uses
-  absolute `raw.githubusercontent.com` URLs.
-- **Docs site** (`site/`): the light/dark lockups as the Starlight logo, `favicon.svg` + `favicon.ico`
-  - `apple-touch-icon.png` in the head, `social.png` as `og:image`/`twitter:image`.
-- **Admin UI and analytics widget** (`src/ui/`): `symbol.svg` in the navbar next to the title (unless
-  the host passes `logoUrl`), the favicon set in `index.html`. The React embeds render inside the
-  host's page and show no favicon.
-- **Container image**: no OCI logo annotation exists; upload `logo-256.png` where a registry asks.
+  absolute `raw.githubusercontent.com` URLs (served as `image/svg+xml`).
+- **Docs site** (`site/`): the light/dark lockup SVGs as the Starlight logo, `logo.svg` in the hero,
+  `favicon.svg` (+ `favicon.ico` and `apple-touch-icon.png` fallbacks) in the head, `social.png` as
+  `og:image`/`twitter:image`.
+- **Admin UI and analytics widget** (`src/ui/`): `symbol.svg` inlined in the navbar next to the title
+  (unless the host passes `logoUrl`), the favicon set in `index.html`. The React embeds render the same
+  inline SVG and no favicon.
+- **Avatars and registries** that only accept rasters (GitHub repository picture, GHCR): export one
+  from `logo.svg` at the size they ask for (`rsvg-convert -w 512 docs/assets/logo.svg -o logo.png`);
+  it is not kept in the repository.
 
 ## Palette
 

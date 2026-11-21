@@ -1,6 +1,6 @@
 #!/bin/sh
 # Rebuilds the brand kit in docs/assets/ (docs/BRAND.md): the SVG masters from the geometry in
-# scripts/brand/*.py, then every PNG/ICO raster from the masters, then the copies the docs site
+# scripts/brand/*.py, then the few required rasters (social card, head icon fallbacks), then the copies the docs site
 # and the admin UI serve.
 #
 #   sh scripts/brand-assets.sh           rebuild everything
@@ -16,16 +16,11 @@ cd "$(dirname "$0")/.."
 a=docs/assets
 copies='site/public:favicon.svg site/public:favicon.ico site/public:apple-touch-icon.png site/public:social.png site/public:symbol.svg src/ui/public:favicon.svg src/ui/public:favicon.ico src/ui/public:apple-touch-icon.png src/ui/public:symbol.svg'
 
+# Rasters exist only where a format requires one and nobody sees it as an on-page logo:
+# the social card (og:image must be raster) and the <head> icon fallbacks. Every logo, symbol
+# and lockup shown on a page is the SVG master itself.
 rasters='
-logo.png logo.svg -w 1024 -h 1024
-logo-256.png logo.svg -w 256 -h 256
-logo-128.png logo.svg -w 128 -h 128
 apple-touch-icon.png logo.svg
-symbol.png symbol.svg -h 256
-lockup-horizontal-dark.png lockup-horizontal-dark.svg -z 2
-lockup-horizontal-light.png lockup-horizontal-light.svg -z 2
-lockup-stacked-dark.png lockup-stacked-dark.svg -z 2
-lockup-stacked-light.png lockup-stacked-light.svg -z 2
 social.png social.svg -w 1280 -h 640
 favicon.ico favicon.svg
 '
@@ -84,7 +79,7 @@ printf '%s\n' "$rasters" | while read -r out src args; do
   esac
 done
 
-if command -v oxipng >/dev/null; then oxipng -q -o max "$a"/*.png; fi
+if command -v oxipng >/dev/null; then oxipng -q -o max "$a/apple-touch-icon.png" "$a/social.png"; fi
 
 for c in $copies; do
   dir=${c%%:*}; f=${c#*:}
