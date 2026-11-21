@@ -1,0 +1,11 @@
+@xtandard/links
+Copyright (c) 2026 Santiago Montoya. Licensed under the MIT License (see LICENSE).
+
+The brand artwork in docs/assets/ (wordmarks and the social card) contains glyph outlines made with:
+
+- Urbanist, Copyright 2021 The Urbanist Project Authors (https://github.com/coreyhu/Urbanist),
+  SIL Open Font License 1.1.
+- JetBrains Mono, Copyright 2020 The JetBrains Mono Project Authors
+  (https://github.com/JetBrains/JetBrainsMono), SIL Open Font License 1.1.
+
+The fonts themselves are not distributed with this package.
