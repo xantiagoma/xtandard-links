@@ -64,3 +64,9 @@ def ink_bounds(text, font_path, wght, size, tracking=0.0):
 def x_height(font_path, wght):
     static, _ = _instance(font_path, wght)
     return static["OS/2"].sxHeight / static["head"].unitsPerEm
+
+
+def cap_height(font_path, wght):
+    """OS/2 sCapHeight as a fraction of the em."""
+    static, _ = _instance(font_path, wght)
+    return static["OS/2"].sCapHeight / static["head"].unitsPerEm

@@ -46,3 +46,6 @@ examples/**/next-env.d.ts
 examples/**/tsconfig.tsbuildinfo
 examples/**/.wrangler
 examples/**/.dev.vars
+
+# python bytecode (brand generator)
+__pycache__

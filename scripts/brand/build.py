@@ -2,7 +2,7 @@
 import os, sys
 from mark import *
 from icon import icon
-from text import ink_bounds, outline, x_height
+from text import cap_height, ink_bounds, outline, x_height
 
 FONTS = os.environ["BRAND_FONTS"]
 URBANIST = os.path.join(FONTS, "Urbanist.ttf")
@@ -69,22 +69,23 @@ def wordmark(size, x, baseline, prefix_fill, word_paint, stacked=False):
 def horizontal(theme, mono=None):
     sym_h = 96
     size = (sym_h * 0.5) / XH  # x-height = half the symbol height
-    # Vertical centring (same rule in every xtandard repo): the symbol's centre sits on the
-    # wordmark's optical centre, the middle of the inked height from the top of the tallest
-    # ascender/cap down to the baseline (descenders ignored).
-    top, _bottom = ink_bounds("xtandard-links", URBANIST, 900, size, tracking=-0.012)
-    baseline = sym_h / 2 - top / 2
+    # Vertical centring — the shared xtandard rule (xtandard-flags#20): the symbol's centre (its
+    # full bounds) sits on the wordmark's optical centre, baseline - capHeight/2, with Urbanist's
+    # OS/2 sCapHeight (0.7 em); descenders ignored; canvas = max(symbol height, descender bottom).
+    baseline = sym_h / 2 + cap_height(URBANIST, 900) * size / 2
+    _top, bottom = ink_bounds("xtandard-links", URBANIST, 900, size, tracking=-0.012)
+    canvas_h = max(sym_h, baseline + bottom)
     gap = 30
     if mono:
         sym, sw = symbol_group(sym_h, 0, 0, mono, f"h{mono[1:]}")
         word, ww = wordmark(size, sw + gap, baseline, mono, mono)
-        return svg(sw + gap + ww, sym_h, sym + word)
+        return svg(sw + gap + ww, canvas_h, sym + word)
     prefix = PAPER if theme == "dark" else INK
     stops = LIME_DARK_TEXT if theme == "dark" else LIME_LIGHT_TEXT
     sym, sw = symbol_group(sym_h, 0, 0, "url(#lime)", f"h{theme}")
     word, ww = wordmark(size, sw + gap, baseline, prefix, "url(#word)")
     defs = lime_gradient("lime", stops=LIME if theme == "dark" else LIME_ON_LIGHT) + grad("word", stops, baseline - size * XH * 1.5, baseline + size * 0.2)
-    return svg(sw + gap + ww, sym_h, sym + word, defs)
+    return svg(sw + gap + ww, canvas_h, sym + word, defs)
 
 def stacked(theme):
     sym_h = 160
