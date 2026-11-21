@@ -188,8 +188,10 @@ site/                 Starlight docs site
 
 ## Phases
 
+Status 2026-11-21: phases 1–7 done (see WORKLOG.md); v0.1.0 awaits the owner's first npm publish.
+
 1. **Research gate** — `docs/research/landscape.md`, verdict to t1r. ✅
-2. **Design** — this file + ADRs 0001–0012, report to t1r.
+2. **Design** — this file + ADRs 0001–0012, report to t1r. ✅
 3. **Scaffold** — tooling copied from webhooks (scripts, vite-plus, oxlint/oxfmt, tsconfigs, husky,
    mise, CI, release, LICENSE, CLAUDE.md). GitHub repo `xantiagoma/xtandard-links` created.
 4. **Spine** (lead) — schema, ids, slugs, keys, validation, storage contract + memory driver, core,
