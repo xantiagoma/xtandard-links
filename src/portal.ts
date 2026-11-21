@@ -23,7 +23,7 @@
  * @module
  */
 
-import type { LinksAction } from "./authorization/contract.ts";
+import { LINKS_ACTIONS, type LinksAction } from "./authorization/contract.ts";
 import { durationToMs } from "./duration.ts";
 import { base64url, fromBase64url, hmacSha256, timingSafeEqual } from "./password.ts";
 import type { LinksDuration } from "./schema.ts";
@@ -42,19 +42,7 @@ export const DEFAULT_VIEWER_ACTIONS: readonly LinksAction[] = ["analytics:read",
  * token's tenant (and link set); tenant/domain management, the global audit log
  * and minting further tokens are never grantable.
  */
-export const VIEWER_GRANTABLE_ACTIONS: readonly LinksAction[] = [
-  "tenant:read",
-  "domain:read",
-  "link:read",
-  "link:create",
-  "link:update",
-  "link:delete",
-  "link:import",
-  "analytics:read",
-  "customer:read",
-  "audit:read",
-  "conversion:track",
-];
+export const VIEWER_GRANTABLE_ACTIONS: readonly LinksAction[] = LINKS_ACTIONS.PORTAL_ACTIONS;
 
 /**
  * Thrown by {@link verifyViewerToken} for any invalid token — malformed, bad
