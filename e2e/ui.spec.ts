@@ -140,10 +140,10 @@ test("tenant analytics: ranges, metrics and click-to-filter", async ({ page }) =
   await page.getByRole("button", { name: /^Filter by Germany/ }).click();
   await expect(page).toHaveURL(/filters=country%3ADE|filters=country:DE/);
   await expect(page.getByRole("button", { name: "Clear Country filter" })).toBeVisible();
-  // Germany is a slice of the total; conversions are not split by visitor filters.
+  // Germany is a slice of the total; conversions carry the click's dimensions, so they filter too.
   await expect.poll(kpi).toBeLessThan(total90);
   expect(await kpi()).toBeGreaterThan(0);
-  await expect(page.getByTestId("kpi-leads")).toHaveText("—");
+  await expect(page.getByTestId("kpi-leads")).toHaveText(/^\d[\d,]*$/);
   await page.getByRole("button", { name: "Clear Country filter" }).click();
   await expect(page).not.toHaveURL(/filters=/);
 });
