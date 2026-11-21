@@ -70,7 +70,7 @@ const shots: Shot[] = [
     name: "ui-analytics-dark",
     theme: "dark",
     async run(page) {
-      await page.goto(panel("/analytics?tenant=acme&filters=country:DE"));
+      await page.goto(panel("/analytics?tenant=acme&range=90d"));
       await page.getByTestId("kpi-clicks").waitFor();
       await settle(page);
     },

@@ -51,7 +51,7 @@ test("creates a link with a geo rule and the redirect honours it", async ({ page
   await page
     .getByLabel("Destination URL")
     .fill("https://acme.com/launch?utm_source=e2e&utm_medium=test");
-  await page.getByLabel("Slug").fill(SLUG);
+  await page.getByLabel("Slug", { exact: true }).fill(SLUG);
   // Pasted utm_ params move into the UTM builder.
   await page.getByLabel("Title").click();
   await expect(page.getByLabel("Destination URL")).toHaveValue("https://acme.com/launch");
@@ -103,12 +103,16 @@ test("rule validation blocks saving an incomplete rule", async ({ page }) => {
 test("link detail shows analytics, QR and rules", async ({ page }) => {
   await page.goto(panel("/?tenant=acme"));
   await page.getByLabel("Search links").fill("spring");
+  await expect(page.getByTestId("link-row")).toHaveCount(1);
   await page.getByTestId("link-row").first().click();
   await expect(page.getByRole("heading", { name: "go.acme.com/spring" })).toBeVisible();
   await expect(page.getByTestId("qr-image")).toBeVisible();
   await expect(page.getByText("Country is Germany or Austria")).toBeVisible();
-  const clicks = await page.getByTestId("kpi-clicks").textContent();
-  expect(Number(clicks?.replace(/\D/g, ""))).toBeGreaterThan(0);
+  await expect
+    .poll(async () =>
+      Number((await page.getByTestId("kpi-clicks").textContent())?.replace(/\D/g, "") || 0),
+    )
+    .toBeGreaterThan(0);
   await expect(page.getByText("Recent activity")).toBeVisible();
   await expect(page.getByRole("img", { name: /Clicks over time/ })).toBeVisible();
 });
@@ -116,16 +120,15 @@ test("link detail shows analytics, QR and rules", async ({ page }) => {
 test("tenant analytics: ranges, metrics and click-to-filter", async ({ page }) => {
   await page.goto(panel("/analytics?tenant=acme"));
   await expect(page.getByRole("heading", { name: "Analytics" })).toBeVisible();
-  const total30 = Number((await page.getByTestId("kpi-clicks").textContent())?.replace(/\D/g, ""));
-  expect(total30).toBeGreaterThan(100);
+  const kpi = async () =>
+    Number((await page.getByTestId("kpi-clicks").textContent())?.replace(/\D/g, "") || 0);
+  await expect.poll(kpi).toBeGreaterThan(100);
+  const total30 = await kpi();
 
   await page.getByRole("button", { name: "Last 90 days" }).click();
   await expect(page).toHaveURL(/range=90d/);
-  await expect
-    .poll(async () =>
-      Number((await page.getByTestId("kpi-clicks").textContent())?.replace(/\D/g, "")),
-    )
-    .toBeGreaterThan(total30);
+  await expect.poll(kpi).toBeGreaterThan(total30);
+  const total90 = await kpi();
 
   // Uniques come from the memory sink's capabilities.
   await expect(page.getByTestId("kpi-uniques")).toBeVisible();
@@ -137,13 +140,10 @@ test("tenant analytics: ranges, metrics and click-to-filter", async ({ page }) =
   await page.getByRole("button", { name: /^Filter by Germany/ }).click();
   await expect(page).toHaveURL(/filters=country%3ADE|filters=country:DE/);
   await expect(page.getByRole("button", { name: "Clear Country filter" })).toBeVisible();
-  const de = Number((await page.getByTestId("kpi-clicks").textContent())?.replace(/\D/g, ""));
-  await expect
-    .poll(async () =>
-      Number((await page.getByTestId("kpi-clicks").textContent())?.replace(/\D/g, "")),
-    )
-    .toBeLessThan(total30 * 3);
-  expect(de).toBeGreaterThan(0);
+  // Germany is a slice of the total; conversions are not split by visitor filters.
+  await expect.poll(kpi).toBeLessThan(total90);
+  expect(await kpi()).toBeGreaterThan(0);
+  await expect(page.getByTestId("kpi-leads")).toHaveText("—");
   await page.getByRole("button", { name: "Clear Country filter" }).click();
   await expect(page).not.toHaveURL(/filters=/);
 });
@@ -230,7 +230,7 @@ test("a viewer token renders the reduced widget chrome", async ({ page }) => {
   await expect(page.getByLabel("Tenant")).toHaveCount(0);
   const nav = page.getByRole("navigation", { name: "Main navigation" });
   await expect(nav.getByRole("button")).toHaveText(["Analytics", "Links"]);
-  await expect(page.getByTestId("kpi-clicks")).not.toHaveText("0");
+  await expect(page.getByTestId("kpi-clicks")).toHaveText(/[1-9]/);
 
   // Read-only links: no create/edit/delete affordances.
   await nav.getByRole("button", { name: "Links" }).click();

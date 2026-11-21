@@ -131,7 +131,7 @@ test.describe("widget scope", () => {
     await expect(page.getByRole("heading", { name: "Analytics" })).toBeVisible();
     await expect(page.getByText("Viewer", { exact: true })).toBeVisible();
     await expect(page.getByLabel("Tenant")).toHaveCount(0);
-    await expect(page.getByTestId("kpi-clicks")).not.toHaveText("0");
+    await expect(page.getByTestId("kpi-clicks")).toHaveText(/[1-9]/);
     // The host's own heading keeps the host font (preflight is scoped to the embed).
     const hostFont = await page
       .locator(".host-heading")
@@ -147,9 +147,9 @@ test.describe("widget scope", () => {
 
   test("the dashboard embed routes in memory without touching the host URL", async ({ page }) => {
     await page.goto("/e2e/embed?mode=dashboard&theme=light");
-    await expect(page.getByRole("heading", { name: "Links" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Links", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Analytics", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Analytics" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Analytics", exact: true })).toBeVisible();
     expect(new URL(page.url()).pathname).toBe("/e2e/embed");
     expect(new URL(page.url()).hash).toBe("");
   });

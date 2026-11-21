@@ -167,7 +167,8 @@ function KpiTile({
   unavailable,
 }: {
   metric: MetricKey;
-  value: number;
+  /** `undefined` while loading. */
+  value: number | undefined;
   previous: number | undefined;
   series: number[];
   selected: boolean;
@@ -218,9 +219,13 @@ function KpiTile({
           className="text-2xl font-semibold tabular-nums tracking-tight"
           data-testid={`kpi-${metric}`}
         >
-          {formatMetric(metric, value)}
+          {value === undefined ? (
+            <span className="inline-block h-7 w-20 animate-pulse rounded-md bg-secondary align-middle" />
+          ) : (
+            formatMetric(metric, value)
+          )}
         </span>
-        <Delta current={value} previous={previous} />
+        {value !== undefined && <Delta current={value} previous={previous} />}
       </span>
       <Sparkline values={series} color={meta.color} height={26} className="mt-0.5 opacity-80" />
     </button>
@@ -576,7 +581,7 @@ export function AnalyticsPanel({
           <KpiTile
             key={key}
             metric={key}
-            value={main.data ? metricValue(main.data.totals, key) : 0}
+            value={main.data ? metricValue(main.data.totals, key) : undefined}
             previous={previous.data ? metricValue(previous.data.totals, key) : undefined}
             series={series(key)}
             selected={metric === key}

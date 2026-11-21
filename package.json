@@ -504,6 +504,7 @@
     "docs:preview": "cd site && bun run preview",
     "demo": "bun scripts/demo.ts",
     "seed:demo": "bun scripts/seed-demo.ts",
+    "screenshots": "bun scripts/screenshots.ts",
     "typecheck:examples": "tsc -p examples/tsconfig.json",
     "examples:hono": "bun scripts/example.ts hono",
     "examples:elysia": "bun scripts/example.ts elysia",
