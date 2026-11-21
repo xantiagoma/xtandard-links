@@ -2,7 +2,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/xantiagoma/xtandard-links/main/docs/assets/lockup-horizontal-dark.svg" />
-  <img src="https://raw.githubusercontent.com/xantiagoma/xtandard-links/main/docs/assets/lockup-horizontal-light.svg" alt="xtandard-links" width="420" />
+  <img src="https://raw.githubusercontent.com/xantiagoma/xtandard-links/main/docs/assets/lockup-horizontal-light.svg" alt="@xtandard/links" height="64" />
 </picture>
 
 # @xtandard/links
