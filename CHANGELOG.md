@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.1.1
+
+Branding in the shipped admin UI, widget and React embeds, plus brand, docs and tooling fixes. No
+API, behavior or storage changes.
+
+### Changed
+
+- **ui:** the admin SPA, the viewer widget and the React embeds (`<LinksDashboard>`,
+  `<LinkAnalytics>`) render the bare xtandard-links symbol per theme: `symbol.svg` on dark surfaces
+  and the new `symbol-light.svg` (the light lockups' deeper lime) on light ones, inlined as data
+  URLs. No square tile, and no assets to serve.
+- **brand:** SVG-only logos wherever users see them (README, docs site, UI); the PNG logo variants
+  are gone (`docs/assets/logo*.png`, `symbol.png`, `lockup-*.png`). Rasters remain only for the
+  favicon set, the Apple touch icon and `social.png`. The docs home hero now uses the stacked
+  lockups (light/dark), matching the other xtandard projects.
+
+### Fixed
+
+- **brand:** horizontal lockups are vertically centred with the shared xtandard rule (symbol centre
+  = baseline - capHeight/2), so the symbol sits on the wordmark's optical centre in the navbar and
+  the README header.
+- **hooks:** the pre-commit hook no longer fails on commits that only touch formatter-ignored files
+  (site `.mdx` pages, `CHANGELOG.md`).
+
+### Documentation
+
+- Docs site: Project status and Changelog pages; strict internal-link validation on every page.
+- Ecosystem section (README, docs home and ecosystem page): adds `@xtandard/audit`,
+  `@xtandard/entitlements` (with its npm link) and `@xtandard/xyte`.
+
+### Migration
+
+None. Drop-in from v0.1.0: no API, configuration, storage layout or analytics changes. If you
+linked to the removed PNG logos in `docs/assets/` on GitHub, switch to the `.svg` files of the same
+name.
+
 ## v0.1.0
 
 First release — self-hosted, embeddable branded short links as a library.
