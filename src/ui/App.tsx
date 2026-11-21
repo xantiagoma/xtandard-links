@@ -13,11 +13,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, Lock } from "lucide-react";
 import type { LinksConfig } from "./types.ts";
 import { errorMessage, LinksApiError } from "./types.ts";
-import { getConfig, listTenants, upsertTenant } from "./api.ts";
-import { useToast } from "./components/Toast.tsx";
-import { ThemeToggle } from "./components/ThemeToggle.tsx";
+import { getApiToken, getConfig, listTenants, upsertTenant } from "./api.ts";
+import { useToast } from "@xtandard/kit/ui";
+import { ThemeToggle } from "@xtandard/kit/ui";
 import { BrandMark } from "./components/BrandMark.tsx";
-import { CreatableCombobox } from "./components/primitives.tsx";
+import { CreatableCombobox } from "@xtandard/kit/ui";
 import { EmptyCard, LoadingRow, Page } from "./components/bits.tsx";
 import { LinksView } from "./views/LinksView.tsx";
 import { LinkDetailView } from "./views/LinkDetailView.tsx";
@@ -26,8 +26,8 @@ import { DomainsView } from "./views/DomainsView.tsx";
 import { ImportView } from "./views/ImportView.tsx";
 import { CustomersView } from "./views/CustomersView.tsx";
 import { AuditView } from "./views/AuditView.tsx";
-import { cn } from "./lib/utils.ts";
-import { canLeave } from "./lib/nav-guard.ts";
+import { cn } from "@xtandard/kit/ui";
+import { canLeave } from "@xtandard/kit/ui";
 import { canPerform, ShellContext, type Shell } from "./lib/shell.tsx";
 
 declare global {
@@ -77,6 +77,7 @@ export function App({
   logoUrl,
   initialTenant,
   showThemeToggle = true,
+  forcePortal = false,
 }: {
   locationHook?: BaseLocationHook;
   searchHook?: BaseSearchHook;
@@ -87,6 +88,8 @@ export function App({
   initialTenant?: string;
   /** Show the system/light/dark switcher. Off when an embedding host owns the theme. */
   showThemeToggle?: boolean;
+  /** Render the viewer (widget) chrome from the first render (`LinkAnalytics`). */
+  forcePortal?: boolean;
 }): React.ReactElement {
   return (
     <Router
@@ -94,7 +97,12 @@ export function App({
       {...(searchHook ? { searchHook } : {})}
       base={base}
     >
-      <AppShell logoUrl={logoUrl} initialTenant={initialTenant} showThemeToggle={showThemeToggle} />
+      <AppShell
+        logoUrl={logoUrl}
+        initialTenant={initialTenant}
+        showThemeToggle={showThemeToggle}
+        forcePortal={forcePortal}
+      />
     </Router>
   );
 }
@@ -103,10 +111,12 @@ function AppShell({
   logoUrl,
   initialTenant,
   showThemeToggle,
+  forcePortal,
 }: {
   logoUrl?: string;
   initialTenant?: string;
   showThemeToggle: boolean;
+  forcePortal: boolean;
 }) {
   const toast = useToast();
   const qc = useQueryClient();
@@ -125,7 +135,10 @@ function AppShell({
     ...bootstrap,
     ...configQuery.data,
   };
-  const viewer = config.viewer;
+  // A viewer token (the widget, or `?token=` / `#token=` in the SPA) means the
+  // viewer chrome from the first render: no admin request goes out before
+  // `/config` answers.
+  const viewer = config.viewer || forcePortal || getApiToken() !== null;
   const readonly = config.readonly;
 
   const tenantsQuery = useQuery({

@@ -1,6 +1,6 @@
 import React, { useId, useState } from "react";
 import { X } from "lucide-react";
-import { cn } from "../lib/utils.ts";
+import { cn } from "@xtandard/kit/ui";
 
 /**
  * Edit a list of free-form values as chips. Enter, comma or Tab adds;

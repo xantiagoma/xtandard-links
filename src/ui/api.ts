@@ -11,7 +11,6 @@ import type { CreateLinkInput, UpdateLinkInput } from "../core.ts";
 import type {
   AnalyticsEvent,
   AnalyticsResult,
-  ApiErrorBody,
   AuditEntry,
   Customer,
   Domain,
@@ -22,71 +21,38 @@ import type {
   Tenant,
 } from "./types.ts";
 import { LinksApiError } from "./types.ts";
+import { createApiClient, toQuery, type ApiClient } from "@xtandard/kit/ui";
 
 export type { CreateLinkInput, UpdateLinkInput };
 
-let apiBase = "";
-let apiCredentials: RequestCredentials = "same-origin";
-let apiFetch: FetchLike = (input, init) => fetch(input, init);
-let apiToken: string | null = null;
+/**
+ * The links API client (`@xtandard/kit/ui`'s): a base URL (empty by default,
+ * so the bundled SPA uses relative URLs resolved against the injected
+ * `<base href>`), the `credentials` mode, an optional custom `fetch`, and the
+ * viewer token sent as `Authorization: Bearer lvt_…`. Non-2xx responses throw
+ * {@link LinksApiError}. Each product has its own client, so two dashboards on
+ * one page never share a base URL or token.
+ */
+const client = createApiClient({ errorClass: LinksApiError });
 
-/** The subset of `fetch` the client uses (the global `fetch` satisfies it). */
-export type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-
-/** Options for {@link setApiBase}. */
-export interface ApiClientOptions {
-  /** `credentials` mode for requests. Use `"include"` for cross-origin cookie auth. */
-  credentials?: RequestCredentials;
-  /** Custom fetch implementation (bearer tokens, extra headers, instrumentation). */
-  fetch?: FetchLike;
-}
+export type { ApiClientOptions, FetchLike } from "@xtandard/kit/ui";
 
 /** Point the API client at a base URL (used by the `@xtandard/links/react` export). */
-export function setApiBase(base: string, opts?: ApiClientOptions): void {
-  apiBase = base.replace(/\/$/, "");
-  if (opts?.credentials) apiCredentials = opts.credentials;
-  if (opts?.fetch) apiFetch = opts.fetch;
-}
+export const setApiBase: ApiClient["setApiBase"] = client.setApiBase;
 
 /** Attach an analytics viewer token (`lvt_…`) as a Bearer credential on every request. */
-export function setApiToken(token: string | null): void {
-  apiToken = token;
-}
+export const setApiToken: ApiClient["setApiToken"] = client.setApiToken;
+
+/** The attached viewer token, if any. */
+export const getApiToken: ApiClient["getApiToken"] = client.getApiToken;
 
 /** Absolute-or-relative URL for an API path. */
-export function apiUrl(path: string): string {
-  return apiBase ? `${apiBase}/${path}` : path;
-}
+export const apiUrl: ApiClient["apiUrl"] = client.apiUrl;
 
-async function send(path: string, init?: RequestInit): Promise<Response> {
-  const res = await apiFetch(apiUrl(path), {
-    credentials: apiCredentials,
-    ...init,
-    headers: {
-      // JSON by default; callers sending CSV override it via `init.headers`.
-      ...(typeof init?.body === "string" ? { "Content-Type": "application/json" } : {}),
-      ...(apiToken ? { Authorization: `Bearer ${apiToken}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (!res.ok) {
-    let body: ApiErrorBody;
-    try {
-      body = (await res.json()) as ApiErrorBody;
-    } catch {
-      body = { error: res.statusText || `HTTP ${res.status}` };
-    }
-    throw new LinksApiError(res.status, body);
-  }
-  return res;
-}
+/** Build a query string, skipping empty values. Arrays are comma-joined. */
+export { toQuery } from "@xtandard/kit/ui";
 
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await send(path, init);
-  const text = await res.text();
-  if (!text) return undefined as unknown as T;
-  return JSON.parse(text) as T;
-}
+const { send, req } = client;
 
 const json = (method: string, body: unknown): RequestInit => ({
   method,
@@ -95,19 +61,6 @@ const json = (method: string, body: unknown): RequestInit => ({
 
 const seg = encodeURIComponent;
 const tenantBase = (tenant: string): string => `api/tenants/${seg(tenant)}`;
-
-/** Build a query string, skipping empty values. Arrays are comma-joined. */
-export function toQuery(params: Record<string, string | number | boolean | string[] | undefined>) {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === "") continue;
-    if (Array.isArray(value)) {
-      if (value.length) search.set(key, value.join(","));
-    } else search.set(key, String(value));
-  }
-  const s = search.toString();
-  return s ? `?${s}` : "";
-}
 
 /* ─── Config + tenants ──────────────────────────────────────────────────────── */
 

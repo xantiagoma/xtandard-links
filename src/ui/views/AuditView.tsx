@@ -5,8 +5,8 @@ import type { AuditEntry } from "../types.ts";
 import { errorMessage } from "../types.ts";
 import { useShell } from "../lib/shell.tsx";
 import { formatDateTime, relativeTime } from "../lib/format.ts";
-import { cn } from "../lib/utils.ts";
-import { Segmented } from "../components/primitives.tsx";
+import { cn } from "@xtandard/kit/ui";
+import { Segmented } from "@xtandard/kit/ui";
 import { EmptyCard, LoadingRow, NoTenant, Page, PageHeader } from "../components/bits.tsx";
 
 function formatActor(actor: AuditEntry["actor"]): string {

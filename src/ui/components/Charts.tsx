@@ -19,7 +19,7 @@ import {
   type PlotBox,
 } from "../lib/chart.ts";
 import { bucketLabel, formatCompact } from "../lib/format.ts";
-import { cn } from "../lib/utils.ts";
+import { cn } from "@xtandard/kit/ui";
 
 /** Track an element's content width (ResizeObserver), with a fallback for first paint. */
 function useWidth<T extends HTMLElement>(fallback: number): [React.RefObject<T | null>, number] {

@@ -6,6 +6,7 @@
  * @module
  */
 
+import { ApiError as KitApiError, type ApiErrorBody as KitApiErrorBody } from "@xtandard/kit/ui";
 import type {
   AnalyticsBreakdownRow,
   AnalyticsBucket,
@@ -119,22 +120,12 @@ export interface ImportResult {
   rows: ImportRowResult[];
 }
 
-/** Error body every non-2xx JSON response carries. */
-export interface ApiErrorBody {
-  error: string;
-  errors?: { path: string; message: string }[];
-  code?: string;
-}
+/** Error body every non-2xx JSON response carries (`{ error, code?, errors? }` plus the status). */
+export type ApiErrorBody = KitApiErrorBody;
 
-/** Thrown by the API client for non-2xx responses. */
-export class LinksApiError extends Error {
-  constructor(
-    public readonly status: number,
-    public readonly body: ApiErrorBody,
-  ) {
-    super(body.error || `HTTP ${status}`);
-    this.name = "LinksApiError";
-  }
+/** Thrown by the API client for non-2xx responses, with the real HTTP `status` and the parsed `body`. */
+export class LinksApiError extends KitApiError {
+  override name = "LinksApiError";
 }
 
 /** A user-facing message for any thrown value (API errors include field issues). */

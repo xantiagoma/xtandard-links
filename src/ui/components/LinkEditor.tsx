@@ -26,14 +26,14 @@ import {
 } from "../lib/link-form.ts";
 import { validateRules } from "../lib/rules.ts";
 import { displayUrl, hostOf, shortUrl } from "../lib/format.ts";
-import { cn } from "../lib/utils.ts";
+import { cn } from "@xtandard/kit/ui";
 import { useShell } from "../lib/shell.tsx";
-import { Button } from "./ui-bits.tsx";
-import { Dropdown, Segmented, TextArea, TextInput, ToggleSwitch } from "./primitives.tsx";
+import { Button } from "@xtandard/kit/ui";
+import { Dropdown, Segmented, TextArea, TextInput, ToggleSwitch } from "@xtandard/kit/ui";
 import { ConfirmDialog, Drawer, Field } from "./bits.tsx";
 import { TagInput } from "./TagInput.tsx";
 import { RulesEditor } from "./RulesEditor.tsx";
-import { useToast } from "./Toast.tsx";
+import { useToast } from "@xtandard/kit/ui";
 
 type Section = "link" | "utm" | "rules" | "mobile" | "preview" | "advanced";
 
