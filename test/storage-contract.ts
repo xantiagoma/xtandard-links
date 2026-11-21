@@ -27,11 +27,6 @@ export interface StorageContractOptions {
   compareAndSwap?: boolean;
   /** Run watch semantics (requires `watch`). Delay (ms) to wait for notifications. */
   watch?: boolean | { settleMs: number };
-  /**
-   * The backend can store raw backslashes in keys. Default `true`; unstorage normalizes `\\` to
-   * `:`. (The links key layout never produces one — segments are URI-encoded.)
-   */
-  backslashKeys?: boolean;
 }
 
 const settle = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -141,27 +136,37 @@ export function runStorageContractTests(
       expect(await storage.getItem("lnk/t/Acme/links/lnk_1")).toEqual({ v: "upper" });
     });
 
-    test("prefixes containing LIKE/GLOB metacharacters match literally", async () => {
+    test("keys and prefixes with metacharacters round-trip literally", async () => {
       const storage = await makeStorage();
-      const keys = [
-        "lnk/x%y/a",
-        "lnk/xzy/a",
-        "lnk/x_y/a",
-        "lnk/xay/a",
-        "lnk/x!y/a",
-        "lnk/x*y/a",
-        "lnk/x[y/a",
-      ];
-      if (options.backslashKeys !== false) keys.push("lnk/x\\y/a");
+      // LIKE (% _ ! \\), GLOB (* ? [ ]) and unstorage-normalized (? \\ :) characters.
+      const specials = ["%", "_", "!", "\\", "*", "?", "[", "]", ":", "%25"];
+      const keys = specials.map((c) => `lnk/x${c}y/a`);
+      keys.push("lnk/xzy/a", "lnk/xay/a", "lnk/x/y/a", "lnk/x:y/b");
       for (const k of keys) await storage.setItem(k, { k });
-      expect(await storage.getKeys("lnk/x%y/")).toEqual(["lnk/x%y/a"]);
-      expect(await storage.getKeys("lnk/x_y/")).toEqual(["lnk/x_y/a"]);
-      expect(await storage.getKeys("lnk/x!y/")).toEqual(["lnk/x!y/a"]);
-      if (options.backslashKeys !== false) {
-        expect(await storage.getKeys("lnk/x\\y/")).toEqual(["lnk/x\\y/a"]);
+      for (const k of keys) expect(await storage.getItem(k)).toEqual({ k });
+      for (const c of specials) {
+        expect((await storage.getKeys(`lnk/x${c}y/`)).sort()).toEqual(
+          keys.filter((k) => k.startsWith(`lnk/x${c}y/`)).sort(),
+        );
       }
-      expect(await storage.getKeys("lnk/x*y/")).toEqual(["lnk/x*y/a"]);
-      expect(await storage.getKeys("lnk/x[y/")).toEqual(["lnk/x[y/a"]);
+      expect((await storage.getKeys("lnk/x")).length).toBe(keys.length);
+    });
+
+    test("case-distinct tenants do not collide", async () => {
+      const storage = await makeStorage();
+      for (const t of ["Acme", "acme", "ACME"]) {
+        await storage.setItem(linkKey(t, "lnk_1"), { t });
+        await storage.setItem(`lnk/tenants/${t}`, t);
+      }
+      for (const t of ["Acme", "acme", "ACME"]) {
+        expect(await storage.getItem(linkKey(t, "lnk_1"))).toEqual({ t });
+        expect(await storage.getKeys(linksPrefix(t))).toEqual([linkKey(t, "lnk_1")]);
+      }
+      expect((await storage.getKeys("lnk/tenants/")).sort()).toEqual([
+        "lnk/tenants/ACME",
+        "lnk/tenants/Acme",
+        "lnk/tenants/acme",
+      ]);
     });
 
     test("lists many keys", async () => {

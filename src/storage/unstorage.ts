@@ -23,7 +23,20 @@ export interface UnstorageStorageOptions {
 }
 
 /** Convert an unstorage `:`-separated key back to the `/`-separated form. */
-const fromUnstorageKey = (key: string): string => key.replace(/:/g, "/");
+const ESCAPES: Record<string, string> = { "%": "%25", "?": "%3F", "\\": "%5C", ":": "%3A" };
+const UNESCAPES: Record<string, string> = { "%25": "%", "%3F": "?", "%5C": "\\", "%3A": ":" };
+
+/**
+ * unstorage's key normalization is lossy (it cuts at `?`, turns `\\` and `/` into `:`, and
+ * collapses repeated `:`), so escape `%`, `?`, `\\` and `:` inside segments before handing keys
+ * over: every key round-trips exactly.
+ */
+const toUnstorageKey = (key: string): string =>
+  key.replace(/[%?\\:]/g, (ch) => ESCAPES[ch] as string);
+
+/** Convert an unstorage `:`-separated key back to the original `/`-separated key. */
+const fromUnstorageKey = (key: string): string =>
+  key.replace(/:/g, "/").replace(/%(25|3F|5C|3A)/g, (m) => UNESCAPES[m] as string);
 
 /**
  * Create a {@link LinksStorage} backed by an unstorage `Storage` instance.
@@ -46,23 +59,26 @@ export function createUnstorageStorage(options: UnstorageStorageOptions): LinksS
 
   return {
     async getItem<T>(key: string): Promise<T | null> {
-      const value = await storage.getItem<T>(key);
+      const value = await storage.getItem<T>(toUnstorageKey(key));
       return value === undefined ? null : value;
     },
 
     async setItem<T>(key: string, value: T): Promise<void> {
       // unstorage's setItem rejects `undefined`; the contract never stores it.
-      await storage.setItem(key, value as NonNullable<T>);
+      await storage.setItem(toUnstorageKey(key), value as NonNullable<T>);
     },
 
     async removeItem(key: string): Promise<void> {
-      await storage.removeItem(key);
+      await storage.removeItem(toUnstorageKey(key));
     },
 
     async getKeys(prefix: string): Promise<string[]> {
       // unstorage's getKeys takes a base and returns matching keys with `:`
       // separators; convert them back so callers get their original `/` keys.
-      const keys = await storage.getKeys(prefix);
+      // unstorage treats the base as a namespace (`lnk:x` lists `lnk:x:*` only), while the
+      // contract is a plain string prefix: list from the last `/` boundary, then filter.
+      const base = prefix.slice(0, prefix.lastIndexOf("/") + 1);
+      const keys = await storage.getKeys(toUnstorageKey(base));
       return keys.map(fromUnstorageKey).filter((key) => key.startsWith(prefix));
     },
   } satisfies LinksStorage;

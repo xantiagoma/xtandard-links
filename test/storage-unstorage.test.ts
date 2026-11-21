@@ -3,10 +3,8 @@ import { describe, expect, test } from "vitest";
 import { createUnstorageStorage } from "../src/storage/unstorage.ts";
 import { runStorageContractTests } from "./storage-contract.ts";
 
-runStorageContractTests(
-  "unstorage (memory driver)",
-  () => createUnstorageStorage({ storage: createStorage() }),
-  { backslashKeys: false },
+runStorageContractTests("unstorage (memory driver)", () =>
+  createUnstorageStorage({ storage: createStorage() }),
 );
 
 describe("createUnstorageStorage specifics", () => {
