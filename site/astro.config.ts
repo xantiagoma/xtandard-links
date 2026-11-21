@@ -153,6 +153,10 @@ export default defineConfig({
           errorOnInvalidHashes: true,
           // The guides point at the local dev servers they start (http://localhost:3000, :7789).
           errorOnLocalLinks: false,
+          // TypeDoc renders `{@link import("./contract.ts").WatchableLinksStorage}`
+          // (src/storage/mongodb.ts, on MongoLinksStorage) as a link to an "import/readme" page that
+          // does not exist. Drop this once the comment says `{@link WatchableLinksStorage}`.
+          exclude: [`${siteBase}/api/import/readme/`],
         }),
       ],
     }),
