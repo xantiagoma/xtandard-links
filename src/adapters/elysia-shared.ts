@@ -6,6 +6,7 @@
  * @module
  */
 
+import { createPass as kitCreatePass, type PassContext } from "@xtandard/kit/adapters/elysia";
 import type { LinksCore } from "../core.ts";
 import { createFetchHandler, type LinksPanelOptions } from "../server/create-fetch-handler.ts";
 
@@ -17,6 +18,8 @@ export interface ElysiaLinksHandler {
   core: LinksCore;
   /** The admin API as an OpenAPI 3.1 document (also served at `{basePath}/api/openapi.json`). */
   openapi(): Record<string, unknown>;
+  /** Release the panel (idempotent). */
+  close(): Promise<void>;
 }
 
 /** Create a panel handler suitable for `Elysia.mount(path, handler)`. */
@@ -25,6 +28,7 @@ export function linksPanel(options: LinksPanelOptions): ElysiaLinksHandler {
   const fn = ((request: Request) => handler.fetch(request)) as ElysiaLinksHandler;
   fn.core = handler.core;
   fn.openapi = handler.openapi;
+  fn.close = handler.close;
   return fn;
 }
 
@@ -43,25 +47,11 @@ export interface LinksElysiaOptions extends LinksPanelOptions {
 export function createPass(options: LinksElysiaOptions): {
   prefix: string;
   core: LinksCore;
-  pass: (ctx: { request: Request; body?: unknown }) => Promise<Response>;
+  pass: (ctx: PassContext) => Promise<Response>;
 } {
   const prefix = options.prefix ?? "/links";
   const handler = createFetchHandler({ ...options, basePath: options.basePath ?? prefix });
-
-  const pass = (ctx: { request: Request; body?: unknown }): Promise<Response> => {
-    const r = ctx.request;
-    if (ctx.body != null && ["POST", "PUT", "PATCH", "DELETE"].includes(r.method)) {
-      return handler.fetch(
-        new Request(r.url, {
-          method: r.method,
-          headers: r.headers,
-          body: typeof ctx.body === "string" ? ctx.body : JSON.stringify(ctx.body),
-        }),
-      );
-    }
-    return handler.fetch(r);
-  };
-
+  const { pass } = kitCreatePass({ prefix, fetch: handler.fetch, name: "xtandard-links" });
   return { prefix, core: handler.core, pass };
 }
 

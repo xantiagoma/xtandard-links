@@ -26,6 +26,7 @@
  * @module
  */
 
+import { toNextHandler } from "@xtandard/kit/adapters/next";
 import type { RedirectHandler } from "../redirect.ts";
 import {
   createFetchHandler,
@@ -48,6 +49,7 @@ export interface LinksRouteHandlers {
   OPTIONS: NextRouteHandler;
   core: CreateFetchHandlerResult["core"];
   openapi: CreateFetchHandlerResult["openapi"];
+  close: CreateFetchHandlerResult["close"];
 }
 
 /** Create the panel (`createFetchHandler`); same as the other adapters' `linksPanel`. */
@@ -58,18 +60,7 @@ export function linksPanel(options: LinksPanelOptions): CreateFetchHandlerResult
 /** App-router route handlers serving the panel from a catch-all route. */
 export function linksRouteHandlers(options: LinksPanelOptions): LinksRouteHandlers {
   const panel = createFetchHandler(options);
-  const handle: NextRouteHandler = (request) => panel.fetch(request);
-  return {
-    GET: handle,
-    HEAD: handle,
-    POST: handle,
-    PUT: handle,
-    PATCH: handle,
-    DELETE: handle,
-    OPTIONS: handle,
-    core: panel.core,
-    openapi: panel.openapi,
-  };
+  return { ...toNextHandler(panel), core: panel.core, openapi: panel.openapi, close: panel.close };
 }
 
 /** The `event` Next passes to middleware (structural; only `waitUntil` is used). */
