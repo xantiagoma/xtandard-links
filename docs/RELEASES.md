@@ -61,12 +61,12 @@ The workflow needs `id-token: write` (already set) and npm >= 11.5.1 on the runn
 **Publish failed for a tag?** Re-run it without cutting a new version:
 `gh workflow run release.yml -f tag=vX.Y.Z`.
 
-## Before the first release
+## One-time repository setup
 
-- `CHANGELOG.md` does not exist until the first release writes it; the docs site adds its
-  Changelog page automatically once it does.
 - Upload `docs/assets/social.png` as the GitHub social preview (Settings → General → Social
   preview) and set Pages' source to "GitHub Actions" ([Brand](BRAND.md)).
+- The docs site renders `CHANGELOG.md` as its Changelog page (and the README's "Project status"
+  section next to it), so every release entry shows up there on the next Pages deploy.
 
 ## Conventional commits
 
