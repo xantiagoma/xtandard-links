@@ -1,0 +1,69 @@
+/* The xtandard-links palette (docs/BRAND.md) as Starlight's colour properties: lime on ink.
+   Dark: ink (#0f1215) background, xl-lime (#a6e22a) for links and accents (~12:1).
+   Light: white background, a deeper lime (#3d6b05) for links (~6.4:1) and #457a06 behind button
+   text (~5.2:1) — the artwork lime (#a6e22a) and even xl-lime-on-light (#5e9e08, ~3.3:1) are too
+   pale to carry text on white. Neutrals follow the brand's cool ink/slate/orbit greys. */
+
+:root {
+  --sl-color-accent-low: #22300a;
+  --sl-color-accent: #79bc12;
+  --sl-color-accent-high: #a6e22a;
+
+  --sl-color-white: #fafafa;
+  --sl-color-gray-1: #e6e8ea;
+  --sl-color-gray-2: #c3c8cc;
+  --sl-color-gray-3: #8b939c;
+  --sl-color-gray-4: #4e5459;
+  --sl-color-gray-5: #2d3236;
+  --sl-color-gray-6: #1a1e21;
+  --sl-color-black: #0f1215;
+}
+
+:root[data-theme="light"] {
+  --sl-color-accent-low: #ecf8d0;
+  --sl-color-accent: #457a06;
+  --sl-color-accent-high: #3d6b05;
+
+  --sl-color-white: #0f1215;
+  --sl-color-gray-1: #1c2024;
+  --sl-color-gray-2: #353b40;
+  --sl-color-gray-3: #575e65;
+  --sl-color-gray-4: #8b939c;
+  --sl-color-gray-5: #d3d7db;
+  --sl-color-gray-6: #eef0f2;
+  --sl-color-gray-7: #f7f8f9;
+  --sl-color-black: #ffffff;
+}
+
+/* The header lockup: the SVG's own aspect ratio, a little taller than Starlight's default. */
+.site-title img {
+  height: 1.75rem;
+  width: auto;
+}
+
+/* Mermaid diagrams: centred, never wider than the column, scroll when they must. */
+pre.mermaid,
+.mermaid {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  background: transparent;
+}
+
+/* Wide diagrams scroll sideways on small screens instead of shrinking until their labels are
+   unreadable. */
+.mermaid svg {
+  min-width: min(40rem, 100%);
+}
+@media (max-width: 50rem) {
+  .mermaid svg {
+    min-width: 40rem;
+  }
+}
+
+/* Screenshots in the guides: framed, never wider than the column. */
+.sl-markdown-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
