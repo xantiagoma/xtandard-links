@@ -185,6 +185,8 @@ describe("stats, qr, prune", () => {
 
     out.length = 0;
     expect(await run(["prune"])).toBe(0);
-    expect(stdout()).toMatch(/^Pruned \d+ click refs and \d+ deferred handoffs\.\n$/);
+    expect(stdout()).toMatch(
+      /^Pruned \d+ click refs and \d+ deferred handoffs\.\nPruned \d+ analytics buckets and \d+ recent events\.\n$/,
+    );
   });
 });
