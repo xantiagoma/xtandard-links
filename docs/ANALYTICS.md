@@ -179,7 +179,8 @@ agent)`: unique visitors are countable within a day without storing IPs, and the
 joined across days or tenants. It also keys [A/B variant](RULES.md#ab-variants) stickiness and the
 probabilistic [deferred deep-link](DEEP_LINKS.md) fingerprint.
 
-**Set `salt` in production.** Without it the salt is random per process: hashes differ between
+**Set `salt` in production** (`VISITOR_SALT` for the standalone server and `xtandard-links serve`).
+Without it the salt is random per process: hashes differ between
 processes and restarts, so uniques over-count, A/B arms are not sticky across instances, and
 deferred deep links cannot be matched by a different process than the one that saw the click.
 
@@ -273,7 +274,7 @@ What rollups cannot do (the query throws `UnsupportedQueryError`, HTTP `400 UNSU
 - **Unique visitors** (`capabilities.uniques: false`).
 
 Bucket retention is not swept automatically: call `analytics.prune()` on a schedule (a cron, a
-`setInterval` in a long-lived process) to drop hourly buckets past `hourlyRetention` and daily
+`setInterval` in a long-lived process, or `xtandard-links prune`) to drop hourly buckets past `hourlyRetention` and daily
 buckets past `dailyRetention`. The recent-events log trims itself every 20 batches (and on
 `prune()`). Each raw event is also one storage write, so set `recentEvents: 0` on a busy install
 that does not need the "recent activity" feed. The rollups write once per touched bucket

@@ -59,8 +59,8 @@ With several instances behind a load balancer:
 - On shutdown, flush what is queued: `await redirects.handler.close()` (pending clicks and click
   counters) and `await panel.core.close()`.
 - Schedule maintenance: `core.prune()` (expired click refs and deferred handoffs) and, with the
-  default KV analytics, `core.analytics.prune()` (bucket retention). A daily cron, or
-  `xtandard-links prune` with the same storage env.
+  default KV analytics, `core.analytics.prune()` (bucket retention). A daily cron running
+  `xtandard-links prune` with the same storage env does both.
 
 ## Path-prefixed links
 
@@ -117,13 +117,14 @@ yourself from the repository root with `docker build -f apps/standalone/Dockerfi
 | `AUTH_MODE`                                              | `none`                                                 | `none` or `basic` (one admin user)                                   |
 | `AUTH_USERNAME`, `AUTH_PASSWORD_HASH`                    | `admin`                                                | scrypt hash ([Auth](AUTH.md)); `AUTH_PASSWORD` for dev only          |
 | `VIEWER_SECRET`                                          | —                                                      | enables analytics viewer tokens (alias `PORTAL_SECRET`)              |
+| `VISITOR_SALT`                                           | random per process                                     | shared visitor-hash salt; set it when running several instances      |
 | `TITLE`, `LOGO_URL`                                      | `@xtandard/links`                                      | navbar wordmark / logo                                               |
 | `READONLY`                                               | —                                                      | `1` / `true` blocks every mutation                                   |
 
 `GET /healthcheck` answers `{ status: "ok", title, version }` (the image's `HEALTHCHECK` uses it).
-The standalone server uses the KV analytics sink in the same storage, edge-header geo, and a
-per-process privacy salt; for an OLAP sink, a shared salt or custom auth, embed the library
-instead. The CLI's other commands work against the same storage ([CLI](CLI.md)).
+The standalone server uses the KV analytics sink in the same storage and edge-header geo, and
+takes its visitor-hash salt from `VISITOR_SALT` (random per process when unset: set it before
+running more than one container). For an OLAP sink or custom auth, embed the library instead. The CLI's other commands work against the same storage ([CLI](CLI.md)).
 
 ## Cloudflare Workers
 
@@ -157,8 +158,7 @@ export default {
       ingestor: { flushIntervalMs: 0 }, // no timers in isolates; waitUntil flushes per request
       privacy: { salt: env.VISITOR_SALT },
     });
-    // Pass waitUntil bound to ctx (a detached `ctx.waitUntil` throws "Illegal invocation").
-    return handler.fetch(request, { waitUntil: (p) => ctx.waitUntil(p) });
+    return handler.fetch(request, ctx); // ctx.waitUntil keeps the click write alive
   },
 };
 ```
@@ -260,7 +260,8 @@ ClickHouse) over KV rollups when clicks are written from many short-lived isolat
 - [ ] The panel has `auth` and `authorization` (never `AUTH_MODE=none` on a reachable host), and its
       first path segment does not collide with slugs on shared hosts ([Adapters](ADAPTERS.md)).
 - [ ] A storage with compare-and-swap when more than one process writes.
-- [ ] `privacy.salt` set to the same secret on every redirect instance.
+- [ ] `privacy.salt` (`VISITOR_SALT` for the standalone server) set to the same secret on every
+      redirect instance.
 - [ ] `getIp` trusts only headers your proxy sets ([Analytics](ANALYTICS.md#geo)).
 - [ ] `portal.secret` / `VIEWER_SECRET` set if you embed the widget; rotate it to revoke tokens.
 - [ ] A schedule for `core.prune()` (and `analytics.prune()` with KV rollups).

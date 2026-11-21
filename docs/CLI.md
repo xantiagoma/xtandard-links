@@ -41,8 +41,9 @@ xtandard-links serve [--port 3000] [--base-path /links] [--domain localhost]
 The admin panel at `--base-path` (`BASE_PATH`, default `/links`; `/` redirects there) and the
 redirect handler on every other path, on one port, under Bun (`bunx`) or Node (`npx`).
 `--domain` (`DEFAULT_DOMAIN`, default `localhost`) is registered as the shared default domain.
-Authentication, viewer tokens, `READONLY`, `TITLE`, `LOGO_URL` and `REDIRECT_BASE_PATH` come from
-the environment ([Deployment](DEPLOYMENT.md#standalone-cli-and-docker)); with `AUTH_MODE=none` (the
+Authentication, viewer tokens, `READONLY`, `TITLE`, `LOGO_URL`, `REDIRECT_BASE_PATH` and
+`VISITOR_SALT` (the shared visitor-hash salt: set it when running several instances) come from the
+environment ([Deployment](DEPLOYMENT.md#standalone-cli-and-docker)); with `AUTH_MODE=none` (the
 default) it prints a warning: do not expose that publicly. `GET /healthcheck` answers
 `{ status, title, version }`.
 
@@ -117,9 +118,9 @@ xtandard-links prune
 ```
 
 Deletes click refs older than the attribution window and expired or claimed deferred deep-link
-handoffs (`core.prune()`). Run it from cron against your production storage. It does not prune
-KV analytics buckets; call `analytics.prune()` from your app for that
-([Analytics](ANALYTICS.md#kv-rollups-default)).
+handoffs (`core.prune()`), and, with the default KV analytics sink, hourly and daily buckets past
+their retention plus the excess of the recent-events log (`analytics.prune()`,
+[Analytics](ANALYTICS.md#kv-rollups-default)). Run it from cron against your production storage.
 
 ## Exit codes
 

@@ -264,8 +264,8 @@ malware block lists.
 
 ## Built-in pages
 
-The redirect handler renders four small `noindex` pages itself: not found
-(404, from `fetch` when nothing else answers), expired (410), password, and link preview. Render your own with `renderPage`:
+The redirect handler renders four small `noindex` pages itself, in the brand's lime and in light
+and dark: not found (404, from `fetch` when nothing else answers), expired (410), password, and link preview. Render your own with `renderPage`:
 
 ```ts
 createRedirectHandler({
