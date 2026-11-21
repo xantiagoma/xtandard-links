@@ -53,7 +53,9 @@ export default defineConfig({
   },
   staged: {
     // Pre-commit only formats; lint + typecheck run in pre-push (`bun run check`) and CI.
-    "*.{ts,tsx,md,mdx,json,jsonc,yml,yaml,css,html}": ["vp fmt"],
+    // No .mdx (fmt ignores it), and a commit touching only fmt-ignored files (CHANGELOG.md)
+    // must not fail with "Expected at least one target file".
+    "*.{ts,tsx,md,json,jsonc,yml,yaml,css,html}": ["vp fmt --no-error-on-unmatched-pattern"],
   },
   pack: {
     entry: [
