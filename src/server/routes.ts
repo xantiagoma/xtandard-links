@@ -14,9 +14,20 @@
  * @module
  */
 
+import {
+  authenticate as authenticateRequest,
+  authorize as authorizeRequest,
+  error,
+  intParam as kitIntParam,
+  json,
+  mapError as kitMapError,
+  match,
+  methodNotAllowed,
+  type Authenticated,
+  type ErrorMap,
+} from "@xtandard/kit/server";
 import type { AnalyticsQuery, EventsQuery } from "../analytics/contract.ts";
 import { ANALYTICS_DIMENSIONS, type AnalyticsDimension } from "../analytics/contract.ts";
-import { UnsupportedQueryError } from "../analytics/kv.ts";
 import type { AuthProvider, Principal } from "../auth/contract.ts";
 import {
   isMutatingAction,
@@ -25,10 +36,7 @@ import {
   type LinksResource,
 } from "../authorization/contract.ts";
 import {
-  ConflictError,
-  NotFoundError,
   publicLink,
-  ReadonlyError,
   type CreateLinkInput,
   type ImportConflictPolicy,
   type LinksCore,
@@ -37,16 +45,13 @@ import {
   type TrackSaleInput,
   type UpdateLinkInput,
 } from "../core.ts";
-import { CsvParseError } from "../csv.ts";
 import { durationToMs } from "../duration.ts";
-import { HookDeniedError } from "../hooks/contract.ts";
 import { LINKS_CSV_FORMATS, linksToCsv, parseLinksCsv, type LinksCsvFormat } from "../import.ts";
 import {
   createViewerToken,
   DEFAULT_VIEWER_ACTIONS,
   VIEWER_GRANTABLE_ACTIONS,
   VIEWER_TOKEN_PREFIX,
-  ViewerTokenError,
   verifyViewerToken,
 } from "../portal.ts";
 import { qrUrl, renderQrSvg, type QrEcc } from "../qr.ts";
@@ -116,34 +121,6 @@ class NotConfiguredError extends Error {
   }
 }
 
-const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
-
-const json = (data: unknown, status = 200): Response =>
-  new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
-
-const error = (status: number, message: string, extra?: Record<string, unknown>): Response =>
-  json({ error: message, ...extra }, status);
-
-/** Match `pattern` (with `:name` segments) against `path`. */
-function match(pattern: string, path: string): Record<string, string> | null {
-  const pp = pattern.split("/").filter(Boolean);
-  const ap = path.split("/").filter(Boolean);
-  if (pp.length !== ap.length) return null;
-  const params: Record<string, string> = {};
-  for (let i = 0; i < pp.length; i++) {
-    const seg = pp[i] as string;
-    const val = ap[i] as string;
-    if (seg.startsWith(":")) {
-      try {
-        params[seg.slice(1)] = decodeURIComponent(val);
-      } catch {
-        return null;
-      }
-    } else if (seg !== val) return null;
-  }
-  return params;
-}
-
 /** Build the audit {@link Actor} for a principal. */
 function actorFor(principal: Principal): Actor {
   return {
@@ -153,12 +130,9 @@ function actorFor(principal: Principal): Actor {
   };
 }
 
-/** Parse a positive-integer query param, or `undefined`. */
-function intParam(value: string | null): number | undefined {
-  if (value === null || value === "") return undefined;
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined;
-}
+/** Parse a positive-integer query param, or `undefined` (an invalid value is ignored). */
+const intParam = (value: string | null): number | undefined =>
+  kitIntParam(value, { invalid: "ignore" });
 
 const boolParam = (value: string | null): boolean | undefined =>
   value === null ? undefined : value === "true" || value === "1" || value === "";
@@ -936,31 +910,42 @@ export function createApiHandler(
     },
   ];
 
-  async function authenticate(
-    request: Request,
-  ): Promise<{ principal: Principal | null; scope: ViewerScope | null }> {
-    const header = request.headers.get("authorization");
-    if (ctx.portal && header?.startsWith(`Bearer ${VIEWER_TOKEN_PREFIX}`)) {
-      // A presented viewer token short-circuits the host's providers: valid →
-      // viewer principal; invalid/expired → 401 (thrown), never a fallback.
-      const claims = await verifyViewerToken(ctx.portal.secret, header.slice("Bearer ".length));
-      const granted = claims.allow ?? ctx.portal.allow ?? DEFAULT_VIEWER_ACTIONS;
-      const scope: ViewerScope = {
-        tenant: claims.tenant,
-        links: claims.links ? new Set(claims.links) : null,
-        allow: new Set(granted.filter((a) => VIEWER_GRANTABLE_ACTIONS.includes(a))),
-        exp: claims.exp,
-      };
-      return {
-        principal: {
-          id: `viewer:${claims.tenant}`,
-          roles: ["viewer"],
-          metadata: { viewer: true, tenant: claims.tenant, links: claims.links ?? null },
-        },
-        scope,
-      };
-    }
-    return { principal: await ctx.auth.authenticate(request), scope: null };
+  /**
+   * Authenticate a request. A presented viewer token short-circuits the host's
+   * providers: valid → viewer principal; invalid/expired → 401 (thrown), never a
+   * fallback. A throwing host auth provider propagates (→ 500).
+   */
+  async function authenticate(request: Request): Promise<Authenticated<ViewerScope>> {
+    const portal = ctx.portal;
+    return authenticateRequest<ViewerScope>(request, {
+      auth: ctx.auth,
+      ...(portal
+        ? {
+            scoped: {
+              prefix: VIEWER_TOKEN_PREFIX,
+              verify: async (token) => {
+                const claims = await verifyViewerToken(portal.secret, token);
+                const granted = claims.allow ?? portal.allow ?? DEFAULT_VIEWER_ACTIONS;
+                return {
+                  tenant: claims.tenant,
+                  links: claims.links ? new Set(claims.links) : null,
+                  allow: new Set(granted.filter((a) => VIEWER_GRANTABLE_ACTIONS.includes(a))),
+                  exp: claims.exp,
+                };
+              },
+              principal: (scope) => ({
+                id: `viewer:${scope.tenant}`,
+                roles: ["viewer"],
+                metadata: {
+                  viewer: true,
+                  tenant: scope.tenant,
+                  links: scope.links ? [...scope.links] : null,
+                },
+              }),
+            },
+          }
+        : {}),
+    });
   }
 
   return async function handleApiRequest(request, path) {
@@ -980,14 +965,14 @@ export function createApiHandler(
       return json(buildOpenApiDocument({ basePath: ctx.basePath, title: ctx.title }));
     }
 
-    let principal: Principal | null;
-    let scope: ViewerScope | null;
+    let authenticated: Authenticated<ViewerScope>;
     try {
-      ({ principal, scope } = await authenticate(request));
+      authenticated = await authenticate(request);
     } catch (err) {
       // A throwing auth provider is a backend failure → 500; a bad viewer token → 401.
       return mapError(err);
     }
+    const { principal, scoped: scope } = authenticated;
 
     // Public bootstrap config: whether to show a login, the widget chrome, etc.
     if (path === "/config" || path === "/api/config") {
@@ -1036,44 +1021,27 @@ export function createApiHandler(
           action,
         });
       }
-      if (scope) {
-        // The host's authorization provider is NOT consulted for viewers — the
-        // token's scope is the whole grant.
-        const forbidden = error(403, "Forbidden", { action });
-        if (!scope.allow.has(action)) return forbidden;
-        if (resource.type === "domain") {
-          // Shared domains (no tenant) are readable by every tenant's viewers.
-          if (resource.tenant !== undefined && resource.tenant !== scope.tenant) return forbidden;
-          return action === "domain:read" ? null : forbidden;
-        }
-        if (resource.tenant !== scope.tenant) return forbidden;
-        if (scope.links) {
-          if (resource.type === "link") {
-            if (action === "link:create" || action === "link:import") return forbidden;
-            if (resource.linkId !== undefined && !scope.links.has(resource.linkId)) {
-              return forbidden;
-            }
-          }
-          if (resource.type === "analytics") {
-            if (!resource.linkIds || resource.linkIds.some((id) => !scope.links?.has(id))) {
-              return forbidden;
-            }
-          }
-        }
-        return null;
-      }
-      const ok = await ctx.authorization.authorize({ principal: who, action, resource, request });
+      const ok = await authorizeRequest(
+        authenticated,
+        { action, resource, request },
+        {
+          authorization: ctx.authorization,
+          // The host's authorization provider is NOT consulted for viewers — the
+          // token's scope is the whole grant.
+          scope: (grant, action, resource) => viewerAllows(grant, action, resource),
+        },
+      );
       return ok ? null : error(403, "Forbidden", { action });
     };
 
     const url = new URL(request.url);
-    let methodMismatch = false;
+    const allowed: string[] = [];
     try {
       for (const route of routes) {
         const params = match(route.pattern, path);
         if (!params) continue;
         if (route.method !== method) {
-          methodMismatch = true;
+          allowed.push(route.method);
           continue;
         }
         return await route.handler({
@@ -1089,65 +1057,60 @@ export function createApiHandler(
     } catch (err) {
       return mapError(err);
     }
-    return methodMismatch ? error(405, "Method Not Allowed") : error(404, "Not found");
+    return allowed.length > 0 ? methodNotAllowed(allowed) : error(404, "Not found");
   };
 }
 
 /**
- * Cross-bundle error detection: `instanceof` first, `err.name` fallback. An
- * error thrown from a separate subpath bundle carries its own copy of the
- * class, so `instanceof` alone would mis-map it to 500.
+ * A viewer token's grant: its actions, confined to its tenant (shared domains
+ * are readable by every tenant's viewers) and, for a link-scoped token, its
+ * link set.
  */
-function isNamed(err: unknown, ctor: new (...args: never[]) => Error, name: string): boolean {
-  return err instanceof ctor || (err instanceof Error && err.name === name);
+function viewerAllows(scope: ViewerScope, action: LinksAction, resource: LinksResource): boolean {
+  if (!scope.allow.has(action)) return false;
+  if (resource.type === "domain") {
+    if (resource.tenant !== undefined && resource.tenant !== scope.tenant) return false;
+    return action === "domain:read";
+  }
+  if (resource.tenant !== scope.tenant) return false;
+  if (scope.links) {
+    if (resource.type === "link") {
+      if (action === "link:create" || action === "link:import") return false;
+      if (resource.linkId !== undefined && !scope.links.has(resource.linkId)) return false;
+    }
+    if (resource.type === "analytics") {
+      if (!resource.linkIds || resource.linkIds.some((id) => !scope.links?.has(id))) return false;
+    }
+  }
+  return true;
 }
 
-/** A hook denial's status (by name, see {@link isNamed}), or `null`. */
-function hookDeniedStatus(err: unknown): number | null {
-  if (err instanceof HookDeniedError) return err.status;
-  if (err instanceof Error && err.name === "HookDeniedError") {
-    const status = (err as { status?: unknown }).status;
-    return typeof status === "number" ? status : 403;
-  }
-  return null;
-}
+/**
+ * The links error contract (status + `code`). Errors are matched by `name`, so
+ * a class copy from another bundle still maps; `HookDeniedError` (its own
+ * status, `HOOK_DENIED`) and `HttpError` are the kit built-ins.
+ */
+const ERROR_MAP: ErrorMap = {
+  ReadonlyError: { status: 403, code: "READONLY" },
+  ViewerTokenError: { status: 401, code: "VIEWER_TOKEN" },
+  NotFoundError: { status: 404, code: "NOT_FOUND" },
+  ConflictError: { status: 409, code: "CONFLICT" },
+  ValidationError: {
+    status: 400,
+    code: "VALIDATION",
+    extra: (e) => {
+      const errors = (e as { errors?: unknown }).errors;
+      return { errors: Array.isArray(errors) ? errors : [] };
+    },
+  },
+  UnsupportedQueryError: { status: 400, code: "UNSUPPORTED_QUERY" },
+  CsvParseError: { status: 400, code: "BAD_CSV" },
+  BadRequestError: { status: 400, code: "BAD_REQUEST" },
+  NotConfiguredError: { status: 501, code: "NOT_CONFIGURED" },
+  SyntaxError: () => error(400, "Invalid JSON body", { code: "BAD_REQUEST" }),
+};
 
 /** Map domain errors to HTTP responses. */
 export function mapError(err: unknown): Response {
-  if (isNamed(err, ReadonlyError, "ReadonlyError")) {
-    return error(403, (err as Error).message, { code: "READONLY" });
-  }
-  const denied = hookDeniedStatus(err);
-  if (denied !== null) return error(denied, (err as Error).message, { code: "HOOK_DENIED" });
-  if (isNamed(err, ViewerTokenError, "ViewerTokenError")) {
-    return error(401, (err as Error).message, { code: "VIEWER_TOKEN" });
-  }
-  if (isNamed(err, NotFoundError, "NotFoundError")) {
-    return error(404, (err as Error).message, { code: "NOT_FOUND" });
-  }
-  if (isNamed(err, ConflictError, "ConflictError")) {
-    return error(409, (err as Error).message, { code: "CONFLICT" });
-  }
-  if (isNamed(err, ValidationError, "ValidationError")) {
-    const errors = (err as { errors?: unknown }).errors;
-    return error(400, (err as Error).message, {
-      code: "VALIDATION",
-      errors: Array.isArray(errors) ? errors : [],
-    });
-  }
-  if (isNamed(err, UnsupportedQueryError, "UnsupportedQueryError")) {
-    return error(400, (err as Error).message, { code: "UNSUPPORTED_QUERY" });
-  }
-  if (isNamed(err, CsvParseError, "CsvParseError")) {
-    return error(400, (err as Error).message, { code: "BAD_CSV" });
-  }
-  if (err instanceof BadRequestError) {
-    return error(400, err.message, { code: "BAD_REQUEST" });
-  }
-  if (err instanceof NotConfiguredError) {
-    return error(501, err.message, { code: "NOT_CONFIGURED" });
-  }
-  if (err instanceof SyntaxError) return error(400, "Invalid JSON body", { code: "BAD_REQUEST" });
-  const message = err instanceof Error ? err.message : "Internal error";
-  return error(500, message);
+  return kitMapError(err, ERROR_MAP);
 }

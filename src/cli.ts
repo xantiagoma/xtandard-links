@@ -741,7 +741,7 @@ async function serve(flags: Flags): Promise<number> {
     await Promise.all([
       import("./server/create-fetch-handler.ts"),
       import("./redirect.ts"),
-      import("./server/base-path.ts"),
+      import("@xtandard/kit/server"),
     ]);
   // Auth first: an unknown AUTH_MODE fails before storage connects or anything listens.
   const { auth, authorization } = await buildAuth();

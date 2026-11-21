@@ -145,7 +145,7 @@ export {
 // The admin panel handler (framework adapters wrap this)
 export { createFetchHandler } from "./server/create-fetch-handler.ts";
 export type { CreateFetchHandlerResult, LinksPanelOptions } from "./server/create-fetch-handler.ts";
-export type { LinksCorsOptions } from "./server/cors.ts";
+export type { LinksCorsOptions } from "./server/create-fetch-handler.ts";
 export type { LinksPortalOptions } from "./server/routes.ts";
 export { buildOpenApiDocument } from "./server/openapi.ts";
 export type { OpenApiOptions } from "./server/openapi.ts";

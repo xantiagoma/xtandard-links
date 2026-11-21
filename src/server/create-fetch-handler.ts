@@ -11,8 +11,12 @@
  * @module
  */
 
-import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import {
+  createPanelHandler,
+  requireOneOf,
+  resolveUiDir,
+  type CorsOptions,
+} from "@xtandard/kit/server";
 import type { AnalyticsSink } from "../analytics/contract.ts";
 import type { AuthProvider } from "../auth/contract.ts";
 import type { AuthorizationProvider } from "../authorization/contract.ts";
@@ -20,12 +24,15 @@ import { createLinksCore, type LinksCore, type LinksCoreOptions } from "../core.
 import type { HookErrorReporter, LinksHooksInput } from "../hooks/contract.ts";
 import type { LinksStorage } from "../storage/contract.ts";
 import { VERSION } from "../version.ts";
-import { normalizeBasePath, stripBasePath } from "./base-path.ts";
-import { applyCorsHeaders, preflightResponse, type LinksCorsOptions } from "./cors.ts";
 import { buildOpenApiDocument } from "./openapi.ts";
-import { renderIndexHtml } from "./render-index-html.ts";
 import { createApiHandler, type ApiContext, type LinksPortalOptions } from "./routes.ts";
-import { looksLikeAsset, serveStaticAsset } from "./static-assets.ts";
+
+/**
+ * CORS for the panel: `origin` (a string, a list, or a predicate; `"*"` with
+ * `credentials` echoes the caller's origin), `credentials`, `methods`,
+ * `headers` and `maxAge`.
+ */
+export type LinksCorsOptions = CorsOptions;
 
 /** Options for the panel handler (shared by every framework adapter). */
 export interface LinksPanelOptions {
@@ -91,28 +98,13 @@ export interface CreateFetchHandlerResult {
    * Merge it into your host app's docs.
    */
   openapi(): Record<string, unknown>;
+  /** Release the panel (idempotent). The links panel runs no background work, so it is a no-op. */
+  close(): Promise<void>;
 }
 
 // Anonymous defaults keep embedded usage zero-config; harden via auth/authorization.
 const defaultAuth: AuthProvider = { authenticate: async () => ({ id: "anonymous" }) };
 const defaultAuthorization: AuthorizationProvider = { authorize: async () => true };
-
-/**
- * Locate the built admin SPA (`dist/ui`): beside the compiled module, or at
- * `<repo>/dist/ui` when running from TypeScript source. Falls back to the
- * compiled-layout path so the "build the UI" placeholder still renders.
- */
-function defaultUiDir(): string {
-  try {
-    const candidates = [
-      new URL("./ui", import.meta.url), // compiled: dist/<chunk>.mjs → dist/ui
-      new URL("../../dist/ui", import.meta.url), // source: src/server/*.ts → <repo>/dist/ui
-    ].map((u) => fileURLToPath(u));
-    return candidates.find((p) => existsSync(p)) ?? (candidates[0] as string);
-  } catch {
-    return "./ui";
-  }
-}
 
 /**
  * Build the panel fetch handler.
@@ -135,14 +127,11 @@ function defaultUiDir(): string {
  * ```
  */
 export function createFetchHandler(options: LinksPanelOptions): CreateFetchHandlerResult {
-  const basePath = normalizeBasePath(options.basePath);
   const readonly = options.readonly ?? false;
   const title = options.title ?? "@xtandard/links";
-  const uiDir = options.uiDir ?? defaultUiDir();
 
-  if (!options.core && !options.storage) {
-    throw new Error("createFetchHandler requires either `storage` or a prebuilt `core`. Pass one.");
-  }
+  // Either a prebuilt `core` or a `storage` to build one from is required.
+  requireOneOf("createFetchHandler", options, ["storage", "core"]);
 
   const core =
     options.core ??
@@ -156,6 +145,22 @@ export function createFetchHandler(options: LinksPanelOptions): CreateFetchHandl
       ...(options.onHookError ? { onHookError: options.onHookError } : {}),
     });
 
+  let api: ((request: Request, path: string) => Promise<Response | null>) | undefined;
+  const panel = createPanelHandler({
+    basePath: options.basePath,
+    title,
+    readonly,
+    globalName: "__LINKS_CONFIG__",
+    uiDir: options.uiDir ?? resolveUiDir(import.meta.url),
+    ...(options.logoUrl !== undefined ? { logoUrl: options.logoUrl } : {}),
+    ...(options.cors ? { cors: options.cors } : {}),
+    // The links API answers `/healthcheck` itself, with `{ status, version }`.
+    healthcheck: false,
+    api: (request, path) => api!(request, path),
+    bootstrap: () => ({ readonly: readonly || core.readonly, version: VERSION }),
+  });
+  const { basePath } = panel;
+
   const apiCtx: ApiContext = {
     core,
     auth: options.auth ?? defaultAuth,
@@ -167,54 +172,14 @@ export function createFetchHandler(options: LinksPanelOptions): CreateFetchHandl
     ...(options.portal ? { portal: options.portal } : {}),
     ...(options.redirectBasePath ? { redirectBasePath: options.redirectBasePath } : {}),
   };
-  const api = createApiHandler(apiCtx);
-  const cors = options.cors;
+  api = createApiHandler(apiCtx);
 
-  async function fetch(request: Request): Promise<Response> {
-    // CORS preflight: answer OPTIONS directly so it works for any path,
-    // independent of the host framework wrapping this handler.
-    if (cors && request.method === "OPTIONS") return preflightResponse(request, cors);
-    const response = await respond(request);
-    return cors ? applyCorsHeaders(request, response, cors) : response;
-  }
-
-  async function respond(request: Request): Promise<Response> {
-    const url = new URL(request.url);
-    const path = stripBasePath(url.pathname, basePath);
-
-    // 1. JSON API + bootstrap config.
-    const apiResponse = await api(request, path);
-    if (apiResponse) return apiResponse;
-
-    // 2. Only GET/HEAD reach the static UI.
-    if (request.method !== "GET" && request.method !== "HEAD") {
-      return new Response("Method Not Allowed", { status: 405 });
-    }
-
-    // 3. Static asset.
-    const asset = await serveStaticAsset(uiDir, path);
-    if (asset) return asset;
-
-    // 4. A path that looks like a file but was not found → 404 (don't mask with the SPA).
-    if (path !== "/" && looksLikeAsset(path)) {
-      return new Response("Not Found", { status: 404 });
-    }
-
-    // 5. SPA fallback.
-    const html = await renderIndexHtml(uiDir, {
-      title,
-      basePath,
-      readonly: readonly || core.readonly,
-      version: VERSION,
-      ...(options.logoUrl !== undefined ? { logoUrl: options.logoUrl } : {}),
-    });
-    return new Response(html, {
-      status: 200,
-      headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" },
-    });
-  }
-
-  return { fetch, core, openapi: () => buildOpenApiDocument({ basePath, title }) };
+  return {
+    fetch: panel.fetch,
+    core,
+    openapi: () => buildOpenApiDocument({ basePath, title }),
+    close: panel.close,
+  };
 }
 
 export type { LinksPortalOptions };
