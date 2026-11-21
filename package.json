@@ -1,6 +1,6 @@
 {
   "name": "@xtandard/links",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Self-hosted, embeddable branded short links: memory-first redirects, click analytics, conversion attribution and deep links, with pluggable storage and an embeddable admin UI.",
   "keywords": [
     "analytics",
