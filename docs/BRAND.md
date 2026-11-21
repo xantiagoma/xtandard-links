@@ -96,6 +96,11 @@ Icon space is 1024 × 1024, corner radius 224 (21.9%), the family's tile, rim, o
   uses a 44-unit stroke and a 13-unit cut.
 - **Brackets**: `<` and `>` 34-unit strokes in `xl-orbit`, centred vertically at x 168–232 and 856–920.
 
+**Horizontal lockups**: the symbol's vertical centre sits on the wordmark's optical centre — the
+middle of the inked height from the top of the tallest ascender/cap to the baseline (descenders
+ignored) — with a 30-unit gap (at a 96-unit symbol height). The same rule applies across the
+xtandard repositories.
+
 **Clear space**: a ring's width (about 10% of the symbol's height) on every side of the symbol or a
 lockup; 10% of the tile's width outside the app icon.
 

@@ -2,7 +2,7 @@
 import os, sys
 from mark import *
 from icon import icon
-from text import outline, x_height
+from text import ink_bounds, outline, x_height
 
 FONTS = os.environ["BRAND_FONTS"]
 URBANIST = os.path.join(FONTS, "Urbanist.ttf")
@@ -69,7 +69,11 @@ def wordmark(size, x, baseline, prefix_fill, word_paint, stacked=False):
 def horizontal(theme, mono=None):
     sym_h = 96
     size = (sym_h * 0.5) / XH  # x-height = half the symbol height
-    baseline = sym_h * 0.86
+    # Vertical centring (same rule in every xtandard repo): the symbol's centre sits on the
+    # wordmark's optical centre, the middle of the inked height from the top of the tallest
+    # ascender/cap down to the baseline (descenders ignored).
+    top, _bottom = ink_bounds("xtandard-links", URBANIST, 900, size, tracking=-0.012)
+    baseline = sym_h / 2 - top / 2
     gap = 30
     if mono:
         sym, sw = symbol_group(sym_h, 0, 0, mono, f"h{mono[1:]}")

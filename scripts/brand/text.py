@@ -5,6 +5,7 @@ from fontTools.ttLib import TTFont
 from fontTools.varLib import instancer
 from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
+from fontTools.pens.boundsPen import BoundsPen
 
 @functools.lru_cache(maxsize=None)
 def _instance(path, wght):
@@ -37,6 +38,28 @@ def outline(text, font_path, wght, size, x=0.0, y=0.0, tracking=0.0):
         glyph_set[name].draw(tpen)
         cursor += pos.x_advance + tracking * upem
     return pen.getCommands(), cursor * scale
+
+def ink_bounds(text, font_path, wght, size, tracking=0.0):
+    """(top, bottom) of the inked glyphs relative to the baseline (y grows down), so
+    `top` is negative: the height of the tallest ascender/cap actually drawn."""
+    static, blob = _instance(font_path, wght)
+    face = hb.Face(blob)
+    font = hb.Font(face)
+    buf = hb.Buffer()
+    buf.add_str(text)
+    buf.guess_segment_properties()
+    hb.shape(font, buf, {"kern": True, "liga": True})
+    glyph_set = static.getGlyphSet()
+    order = static.getGlyphOrder()
+    scale = size / face.upem
+    pen = BoundsPen(glyph_set)
+    cursor = 0.0
+    for info, pos in zip(buf.glyph_infos, buf.glyph_positions):
+        tpen = TransformPen(pen, (scale, 0, 0, -scale, (cursor + pos.x_offset) * scale, -pos.y_offset * scale))
+        glyph_set[order[info.codepoint]].draw(tpen)
+        cursor += pos.x_advance + tracking * face.upem
+    xmin, ymin, xmax, ymax = pen.bounds
+    return ymin, ymax
 
 def x_height(font_path, wght):
     static, _ = _instance(font_path, wght)
