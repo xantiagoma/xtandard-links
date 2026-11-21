@@ -67,7 +67,8 @@ What `createRedirectHandler(...).handle(request, ctx?)` does, in order:
    core's `reservedSlugs` (`.well-known`, `api`, `_links`, `favicon.ico`, `robots.txt`) returns
    `null`.
 4. **Resolve.** The resolver returns the link for `host/slugKey` from memory, or loads it. Unknown
-   or `disabled` links go to the domain's `notFoundUrl`, else a 404 page.
+   or `disabled` links redirect to the domain's `notFoundUrl` when it has one; otherwise `handle`
+   returns `null` (and `fetch` renders the 404 page).
 5. **Expiry.** `expiresAt` is checked exactly on every request; `maxClicks` against the approximate
    click counter. Expired links go to `expiredUrl`, else a 410 page.
 6. **Password.** A password-protected link shows a password form; a correct `POST` sets an
@@ -88,15 +89,17 @@ What `createRedirectHandler(...).handle(request, ctx?)` does, in order:
 
 Any exception after the link was resolved degrades to a 302 to `link.url` (unless the link has a
 password) and is reported to `onError`; any earlier exception returns `null`. `handle` never throws.
-`fetch` is `handle` that answers 404 instead of `null`, for standalone use.
+`fetch` is `handle` that renders the 404 page (through `renderPage`, when set) instead of `null`,
+for standalone use.
 
 ### What `null` means
 
 `handle` returns `null` for "not a short link": an unregistered host, a reserved first segment, the
-root without `rootUrl`, a path outside `basePath`, or a method it does not serve. Framework adapters
-turn `null` into the framework's fall-through (`next()`, the next handler, `undefined` in Next.js
-middleware), so short links can share a host with your app. An **unknown slug on a registered
-domain** is not `null`: it is answered with the 404 page (or `notFoundUrl`).
+root without `rootUrl`, a path outside `basePath`, a method it does not serve, and an **unknown or
+disabled slug on a domain without `notFoundUrl`**. Framework adapters turn `null` into the
+framework's fall-through (`next()`, the next handler, `undefined` in Next.js middleware), so short
+links can sit in front of your own routes on a shared host. On a dedicated short domain, set
+`notFoundUrl` (unknown slugs redirect there) or answer with `fetch` (the built-in 404 page).
 
 ## The resolver
 

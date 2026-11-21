@@ -217,8 +217,9 @@ const result = await core.queryAnalytics({
 
 **Dimensions** (for `groupBy` and `filters`): `link`, `domain`, `country`, `continent`, `city`,
 `device`, `os`, `browser`, `referrer` (the host), `utm_source`, `utm_medium`, `utm_campaign`, `qr`
-(`"true"` / `"false"`), `variant`. A missing value reads `"(none)"`. Lead and sale events carry only
-`link` and `domain`; every other dimension reads `"(none)"` for them.
+(`"true"` / `"false"`), `variant`. A missing value reads `"(none)"`. Lead and sale events carry the
+dimensions of the click they are attributed to (copied from its click ref), so conversions break
+down by country, device, referrer, UTM or A/B variant like clicks do.
 
 **Metrics**: `clicks` (non-bot), `botClicks`, `leads`, `sales`, `saleAmount` (minor units, summed as
 is across currencies), and `uniques` when the sink can count them.

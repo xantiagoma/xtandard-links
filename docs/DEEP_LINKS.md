@@ -125,12 +125,14 @@ Content-Type: application/json
   "clickId": "clk_01J…",
   "linkId": "lnk_01J…",
   "path": "/product/42",
-  "url": "https://apps.apple.com/app/id123456789"
+  "url": "https://acme.com/product/42"
 }
 ```
 
 No match is `404 { "matched": false }`. A handoff can be claimed **once**. `path` is
-`deepLink.path` (`/` when unset) and `url` is where the visitor was redirected. The endpoint lives
+`deepLink.path` (`/` when unset) and `url` is the link's web destination, never the store listing:
+`link.url` with its UTM (and click id) when the visitor was sent to a store, otherwise the URL they
+were redirected to. Apps that route by URL can use it instead of `path`. The endpoint lives
 under the redirect handler's `basePath` when it has one (`/l/_links/deferred/claim`), needs no
 auth, and is answered on registered domains (and, with `basePath`, on any host).
 

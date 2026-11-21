@@ -192,16 +192,16 @@ The analytics: Workers Analytics Engine as above (sampled at volume, three month
 Tinybird, which are `fetch`-based and also readable from the admin side. Avoid the KV rollup sink on
 Workers KV: rollups are read-modify-write and KV writes are limited per key.
 
-Click counters (the `clicks` shown in lists, and `maxClicks`) flush to storage on a timer, which an
-idle isolate may never run: on Workers treat them as approximate, and rely on the analytics sink
-for numbers.
+Click counters (the `clicks` shown in lists, and `maxClicks`) are flushed with the request's
+`waitUntil` on edge runtimes, so they persist even though isolate timers do not.
 
-The admin side runs where your app runs (a Node/Bun server, the Docker image, a Next.js app)
-against the same storage and sink. The panel serves the bundled UI from the file system, so it does
-not run in a Worker as-is.
-
-> TODO(examples): link the Cloudflare Workers example (`examples/cloudflare-workers`) once it lands,
-> and confirm the recommended admin topology for a Workers-KV-only setup.
+**Managing links on a Workers-only setup.** The panel's JSON API runs in a Worker (enable
+`nodejs_compat` for its imports), but the bundled UI is served from the file system, which a Worker
+does not have: mount the panel there as an API (create links with `POST /links/api/…`, the CLI is
+not an option since it cannot reach the KV binding) or keep the control plane on a storage an
+admin server can also reach (above). The runnable
+[`examples/cloudflare-workers`](../examples/cloudflare-workers) does the former: redirects and an
+API-only panel under `/links` (guarded by a token) in one Worker on Workers KV + Analytics Engine.
 
 ## Vercel / Next.js
 

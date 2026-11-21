@@ -138,8 +138,23 @@ when you rotate `portal.secret` (which invalidates every outstanding token). Kee
 
 ## What the widget shows
 
-> TODO(ui): fill in from the shipped widget once the UI lands: the views in widget chrome (totals,
-> clicks over time, top links, countries, devices, referrers, recent clicks?), which controls are
-> hidden when the sink reports `crossFilter: false` / `uniques: false` / `events: false`, how link
-> management appears when the token grants `link:create` / `link:update`, and a screenshot
-> (`docs/assets/ui-widget.png`).
+![The analytics widget (viewer chrome)](assets/ui-widget.png)
+
+The widget is the admin SPA in **viewer chrome**: the navbar shows your `title` / logo, the token's
+tenant (no tenant switcher) and a "Viewer" badge, and only two tabs.
+
+- **Analytics** (the landing view): the range picker (24h, 7d, 30d, 90d), KPI tiles for clicks,
+  visitors, leads, sales and revenue with the change against the previous period, the clicks
+  timeseries, and breakdowns (top links, countries, devices, referrers, …) that filter on click.
+  The same capability rules as the admin apply ([UI](UI.md#how-the-analytics-adapt-to-the-sink)):
+  no Visitors tile without `uniques`, one filter at a time without `crossFilter`, no
+  recent-activity feed without `events`.
+- **Links** (only when the token grants `link:read`, which the default does): the tenant's links,
+  or only the token's `links`, with search, QR codes and each link's detail and analytics. With
+  `link:create` the "New link" button appears; with `link:update` the editor opens on existing
+  links. Archiving, deleting and CSV export stay admin-only in the widget chrome, whatever the
+  token grants.
+
+Numbers always exclude bot clicks. A runnable host app with the widget is
+[`examples/react-embed`](../examples/react-embed); the screenshot of it inside a host page is in
+[UI](UI.md#react-embeds).

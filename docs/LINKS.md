@@ -27,7 +27,7 @@ await core.createDomain({
   hostname: "go.acme.com", // lowercase, no scheme or port
   isDefault: true, // used when a link names no domain
   rootUrl: "https://acme.com", // where "/" redirects (unset: fall through)
-  notFoundUrl: "https://acme.com/404", // where unknown slugs redirect (unset: 404 page)
+  notFoundUrl: "https://acme.com/404", // where unknown slugs redirect (unset: fall through)
 });
 
 // A customer's branded domain: only that tenant may use it.
@@ -40,7 +40,7 @@ await core.createDomain({ hostname: "links.customer.com", tenant: "customer-42",
 | `tenant`        | unset (shared) | a shared domain is usable by every tenant; an owned one only by its tenant               |
 | `isDefault`     | `false`        | one default per owner: setting it clears the flag on the owner's other domains           |
 | `rootUrl`       | —              | redirect target for the bare domain                                                      |
-| `notFoundUrl`   | —              | redirect target for unknown or disabled slugs                                            |
+| `notFoundUrl`   | —              | redirect target for unknown or disabled slugs (unset: fall through / 404 page)           |
 | `caseSensitive` | `false`        | match slugs case-sensitively; cannot change while the domain has links (`ConflictError`) |
 | `slugLength`    | `7`            | length of generated slugs, 3–32                                                          |
 | `apps`          | —              | iOS / Android associations served from `/.well-known/` ([Deep links](DEEP_LINKS.md))     |
@@ -91,7 +91,7 @@ claimed before the old one is released).
 | `trackConversions`             | `false` | append the click id for attribution: [Conversions](CONVERSIONS.md)                     |
 | `passQuery`                    | `true`  | forward the short URL's query string                                                   |
 | `indexable`                    | `false` | omit `X-Robots-Tag: noindex` so search engines may index the short URL                 |
-| `disabled`                     | `false` | the link answers like an unknown slug (404 page or `notFoundUrl`)                      |
+| `disabled`                     | `false` | the link answers like an unknown slug (`notFoundUrl`, else fall through / 404 page)    |
 | `archived`                     | `false` | hidden from lists by default; **still redirects**                                      |
 | `metadata`                     | —       | host-defined JSON                                                                      |
 | `id`, `createdAt`, `updatedAt` | server  | `id` is `lnk_` + a time-sortable id; `createdBy` is the actor id when one was passed   |
@@ -264,8 +264,8 @@ malware block lists.
 
 ## Built-in pages
 
-The redirect handler renders four small, unbranded, `noindex` pages itself: not found (404),
-expired (410), password, and link preview. Render your own with `renderPage`:
+The redirect handler renders four small `noindex` pages itself: not found
+(404, from `fetch` when nothing else answers), expired (410), password, and link preview. Render your own with `renderPage`:
 
 ```ts
 createRedirectHandler({
