@@ -109,8 +109,11 @@ const isMySqlTable = (table: Table): boolean => {
   return typeof kind === "string" && kind.startsWith("MySql");
 };
 
-/** Escape LIKE wildcards so `getKeys` matches the prefix verbatim (paired with `ESCAPE '\'`). */
-const escapeLike = (literal: string): string => literal.replace(/[\\%_]/g, (c) => `\\${c}`);
+/**
+ * Escape LIKE wildcards so `getKeys` matches the prefix verbatim, paired with `ESCAPE '!'`
+ * (`ESCAPE '\\'` is a syntax error on MySQL, where backslash escapes the closing quote).
+ */
+const escapeLike = (literal: string): string => literal.replace(/[!%_]/g, (c) => `!${c}`);
 
 /** Parse a value defensively — Drizzle returns json parsed, but a string is parsed too. */
 const parseValue = <T>(value: unknown): T => {
@@ -167,8 +170,10 @@ export function createDrizzleStorage(options: DrizzleStorageOptions): DrizzleLin
       const rows = (await db
         .select({ key: table.key })
         .from(table)
-        .where(sql`${table.key} like ${pattern} escape '\\'`)) as Array<{ key: unknown }>;
-      return rows.map((row) => String(row.key));
+        .where(sql`${table.key} like ${pattern} escape '!'`)) as Array<{ key: unknown }>;
+      // SQLite's LIKE folds ASCII case and MySQL's default collations fold case and accents:
+      // keep only exact prefix matches.
+      return rows.map((row) => String(row.key)).filter((key) => key.startsWith(prefix));
     },
   };
 

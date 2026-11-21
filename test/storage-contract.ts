@@ -27,6 +27,11 @@ export interface StorageContractOptions {
   compareAndSwap?: boolean;
   /** Run watch semantics (requires `watch`). Delay (ms) to wait for notifications. */
   watch?: boolean | { settleMs: number };
+  /**
+   * The backend can store raw backslashes in keys. Default `true`; unstorage normalizes `\\` to
+   * `:`. (The links key layout never produces one — segments are URI-encoded.)
+   */
+  backslashKeys?: boolean;
 }
 
 const settle = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -122,6 +127,43 @@ export function runStorageContractTests(
       expect((await storage.getKeys("lnk/s/go.acme.com/")).sort()).toEqual([k1, k2].sort());
     });
 
+    test("keys are case-sensitive (no collation folding)", async () => {
+      const storage = await makeStorage();
+      await storage.setItem("lnk/t/Acme/links/lnk_1", { v: "upper" });
+      await storage.setItem("lnk/t/acme/links/lnk_1", { v: "lower" });
+      await storage.setItem("lnk/t/acmé/links/lnk_1", { v: "accent" });
+      expect(await storage.getItem("lnk/t/Acme/links/lnk_1")).toEqual({ v: "upper" });
+      expect(await storage.getItem("lnk/t/acme/links/lnk_1")).toEqual({ v: "lower" });
+      expect(await storage.getItem("lnk/t/acmé/links/lnk_1")).toEqual({ v: "accent" });
+      expect(await storage.getKeys("lnk/t/Acme/")).toEqual(["lnk/t/Acme/links/lnk_1"]);
+      expect(await storage.getKeys("lnk/t/acme/")).toEqual(["lnk/t/acme/links/lnk_1"]);
+      await storage.removeItem("lnk/t/ACME/links/lnk_1");
+      expect(await storage.getItem("lnk/t/Acme/links/lnk_1")).toEqual({ v: "upper" });
+    });
+
+    test("prefixes containing LIKE/GLOB metacharacters match literally", async () => {
+      const storage = await makeStorage();
+      const keys = [
+        "lnk/x%y/a",
+        "lnk/xzy/a",
+        "lnk/x_y/a",
+        "lnk/xay/a",
+        "lnk/x!y/a",
+        "lnk/x*y/a",
+        "lnk/x[y/a",
+      ];
+      if (options.backslashKeys !== false) keys.push("lnk/x\\y/a");
+      for (const k of keys) await storage.setItem(k, { k });
+      expect(await storage.getKeys("lnk/x%y/")).toEqual(["lnk/x%y/a"]);
+      expect(await storage.getKeys("lnk/x_y/")).toEqual(["lnk/x_y/a"]);
+      expect(await storage.getKeys("lnk/x!y/")).toEqual(["lnk/x!y/a"]);
+      if (options.backslashKeys !== false) {
+        expect(await storage.getKeys("lnk/x\\y/")).toEqual(["lnk/x\\y/a"]);
+      }
+      expect(await storage.getKeys("lnk/x*y/")).toEqual(["lnk/x*y/a"]);
+      expect(await storage.getKeys("lnk/x[y/")).toEqual(["lnk/x[y/a"]);
+    });
+
     test("lists many keys", async () => {
       const storage = await makeStorage();
       for (let i = 0; i < 120; i++) {
@@ -189,6 +231,7 @@ export function runStorageContractTests(
         const key = slugKey("go.acme.com", "w");
         await storage.setItem(key, { tenant: "t", id: "1" });
         await storage.setItem("lnk/t/x/meta", { key: "x" });
+        await settle(settleMs); // filesystem watchers coalesce a create immediately followed by a delete
         await storage.removeItem(key);
         await settle(settleMs);
         off();

@@ -24,23 +24,58 @@ export interface FileStorageOptions {
 const JSON_SUFFIX = ".json";
 
 /**
+ * Encode one key segment as a file name that survives case-insensitive and
+ * normalization-insensitive filesystems (macOS, Windows) and never escapes its
+ * directory: uppercase letters become `^` + the lowercase letter, `^` becomes
+ * `^^`, bytes outside `[a-z0-9._~!@,=+-]` become `%XX`, and a leading `.` is
+ * `%2E` (so `.` / `..` / dotfiles cannot appear).
+ */
+export function encodeSegment(segment: string): string {
+  let out = "";
+  for (const byte of new TextEncoder().encode(segment)) {
+    const ch = String.fromCharCode(byte);
+    if (byte >= 0x41 && byte <= 0x5a) out += `^${ch.toLowerCase()}`;
+    else if (ch === "^") out += "^^";
+    else if (/[a-z0-9._~!@,=+-]/.test(ch) && !(ch === "." && out === "")) out += ch;
+    else out += `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
+  }
+  return out;
+}
+
+/** Reverse {@link encodeSegment}. */
+export function decodeSegment(name: string): string {
+  const bytes: number[] = [];
+  for (let i = 0; i < name.length; i++) {
+    const ch = name[i] as string;
+    if (ch === "^") {
+      const next = name[++i] ?? "";
+      bytes.push((next === "^" ? "^" : next.toUpperCase()).charCodeAt(0));
+    } else if (ch === "%") {
+      bytes.push(Number.parseInt(name.slice(i + 1, i + 3), 16));
+      i += 2;
+    } else bytes.push(ch.charCodeAt(0));
+  }
+  return new TextDecoder().decode(new Uint8Array(bytes));
+}
+
+/**
  * Map a storage key (e.g. `lnk/t/acme/links/lnk_1`) to an absolute file path
- * inside `dir`. Each key segment becomes a directory; the last segment gains a
- * `.json` extension.
+ * under `dir`: each `/`-separated segment becomes an encoded directory/file
+ * name (see {@link encodeSegment}), and the leaf gets a `.json` suffix.
  */
 function keyToPath(dir: string, key: string): string {
-  return join(dir, ...key.split("/")) + JSON_SUFFIX;
+  return join(dir, ...key.split("/").map(encodeSegment)) + JSON_SUFFIX;
 }
 
 /**
  * Reverse {@link keyToPath}: turn an absolute (or `dir`-relative) file path back
  * into the original slash-delimited storage key. Returns `null` for paths that
- * are not `.json` leaves under `dir`.
+ * are not `.json` leaves.
  */
 function pathToKey(dir: string, filePath: string): string | null {
   const rel = relative(dir, filePath);
   if (rel.startsWith("..") || !rel.endsWith(JSON_SUFFIX)) return null;
-  return rel.slice(0, -JSON_SUFFIX.length).split(sep).join("/");
+  return rel.slice(0, -JSON_SUFFIX.length).split(sep).map(decodeSegment).join("/");
 }
 
 /** Recursively collect every `.json` leaf file path under `root`. */

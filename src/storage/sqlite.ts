@@ -94,7 +94,8 @@ export function createSqliteStorage(options: SqliteStorageOptions = {}): SqliteL
     },
     async getKeys(prefix: string): Promise<string[]> {
       const rows = keysStmt.all(`${escapeLike(prefix)}%`) as Array<{ key: string }>;
-      return rows.map((r) => r.key);
+      // SQLite's LIKE folds ASCII case: keep only exact (case-sensitive) prefix matches.
+      return rows.map((r) => r.key).filter((key) => key.startsWith(prefix));
     },
     async compareAndSwap<T>(input: { key: string; expected: T | null; next: T }): Promise<boolean> {
       return swap.immediate(input.key, input.expected, input.next);

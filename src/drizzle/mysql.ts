@@ -2,7 +2,7 @@
  * `@xtandard/links/drizzle/mysql` — MySQL Drizzle table factory for the
  * links KV store. Schema-only (imports just `drizzle-orm/mysql-core`).
  *
- * Base columns: `key varchar PRIMARY KEY` (length configurable), `value json
+ * Base columns: `key varchar … COLLATE utf8mb4_bin PRIMARY KEY` (length configurable), `value json
  * NOT NULL`. `extraColumns`/`extraIndexes` mirror `drizzle-audit`.
  *
  * @example
@@ -18,7 +18,7 @@ import type { BuildColumns } from "drizzle-orm";
 import {
   json,
   mysqlTable,
-  varchar,
+  customType,
   type MySqlColumnBuilderBase,
   type MySqlTableExtraConfigValue,
 } from "drizzle-orm/mysql-core";
@@ -42,6 +42,12 @@ export interface MysqlLinksTableOptions {
   extraIndexes?: (table: MysqlLinksColumns) => MySqlTableExtraConfigValue[];
 }
 
+/** `varchar(n) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin` — exact, case-sensitive keys. */
+const binaryVarchar = (name: string, config: { length: number }) =>
+  customType<{ data: string; driverData: string }>({
+    dataType: () => `varchar(${config.length}) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`,
+  })(name);
+
 /**
  * Build the MySQL `mysqlTable` for the links KV store: `key varchar PRIMARY
  * KEY`, `value json NOT NULL`. The table name defaults to `"xtandard_links_kv"`.
@@ -51,7 +57,9 @@ export function mysqlLinksTable(
   opts?: MysqlLinksTableOptions,
 ): DrizzleKvTable {
   const columns = {
-    key: varchar("key", { length: opts?.keyLength ?? 512 }).primaryKey(),
+    // Binary collation: MySQL's default (utf8mb4_0900_ai_ci) is case- and accent-insensitive,
+    // which would merge keys such as `lnk/t/Acme/…` and `lnk/t/acme/…`.
+    key: binaryVarchar("key", { length: opts?.keyLength ?? 512 }).primaryKey(),
     value: json("value").notNull(),
     ...opts?.extraColumns?.(),
   };
