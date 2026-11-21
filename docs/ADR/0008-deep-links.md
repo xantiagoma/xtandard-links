@@ -24,8 +24,8 @@ for users without the app, and _deferred_ deep linking (open the right screen af
    from the Install Referrer API.
 3. **Deferred handoff** (`link.deepLink.deferred`): on a mobile click the core stores a short-lived
    handoff (`ttl` default 2 h) keyed by click id and by a coarse fingerprint (daily-hashed IP +
-   OS family). On first open the app calls `POST /api/deferred/claim` with `{ clickId }` (exact:
-   Android install referrer / iOS pasteboard) or nothing (probabilistic: fingerprint match, newest
+   OS family). On first open the app calls `POST /_links/deferred/claim` on the short domain with `{ clickId }` (exact:
+   Android install referrer / iOS pasteboard) (plus an optional `platform`) or nothing (probabilistic: fingerprint match, newest
    within the window, `matchType: "probabilistic"` in the response). A handoff is claimable once.
 4. No SDKs: the claim endpoint is a plain JSON call; the docs show Swift/Kotlin snippets.
 

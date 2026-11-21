@@ -40,7 +40,8 @@ groupBy?: Dimension, filters?: Partial<Record<Dimension, string[]>>, limit?, met
 3. Adapters for scale, all `fetch`-based (no peer deps): `analytics/clickhouse` (HTTP interface,
    `JSONEachRow` inserts, generated SQL with parameter binding), `analytics/tinybird` (Events API +
    SQL API), `analytics/analytics-engine` (Workers binding `writeDataPoint` + the SQL API).
-   `analytics/memory` for tests. `fanout([...sinks])` to dual-write during migrations.
+   `analytics/memory` for tests. Dual-writing during a migration is a few lines of user code
+   (a sink whose `ingest` calls both); see docs/ANALYTICS.md.
 4. A shared **sink conformance suite** (`test/analytics-contract.ts`) runs against memory, KV (on
    memory storage), and ClickHouse when `CLICKHOUSE_URL` is set (CI service container).
 

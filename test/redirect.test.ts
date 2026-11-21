@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { ClickEvent } from "../src/index.ts";
+import { createRedirectHandler, type ClickEvent } from "../src/index.ts";
 import { clickRequest, createTestLinks, USER_AGENTS } from "../src/testing.ts";
 
 const clicks = (events: { type: string }[]) =>
@@ -433,5 +433,52 @@ describe("deferred claim endpoint", () => {
     expect(await fuzzy.json()).toMatchObject({ matched: true, matchType: "probabilistic" });
     expect((await claim({})).status).toBe(404);
     expect((await claim("{")).status).toBe(404);
+  });
+});
+
+describe("edge contexts and native clients", () => {
+  test("a Workers-style ctx whose waitUntil needs its receiver still keeps work alive", async () => {
+    const { core } = createTestLinks();
+    await core.createLink({ url: "https://example.com", slug: "w" });
+    const raw = createRedirectHandler({ core, ingestor: { flushIntervalMs: 0 } });
+    const kept: Promise<unknown>[] = [];
+    const ctx = {
+      kept,
+      waitUntil(this: { kept: Promise<unknown>[] }, p: Promise<unknown>) {
+        this.kept.push(p);
+      },
+    };
+    const res = await raw.fetch(clickRequest("https://sho.rt/w"), ctx);
+    expect(res.status).toBe(302);
+    await Promise.all(kept);
+    expect(kept.length).toBeGreaterThan(0);
+    await raw.close();
+  });
+
+  test("deferred claim accepts an explicit platform for native user agents", async () => {
+    const { core, redirects, flush } = createTestLinks();
+    await core.createLink({
+      url: "https://example.com",
+      slug: "dl",
+      deepLink: { path: "/x", deferred: true },
+    });
+    await redirects.fetch(
+      clickRequest("https://sho.rt/dl", { userAgent: USER_AGENTS.android, ip: "198.51.100.9" }),
+    );
+    await flush();
+    const res = await redirects.fetch(
+      clickRequest("https://sho.rt/_links/deferred/claim", {
+        method: "POST",
+        body: JSON.stringify({ platform: "android" }),
+        userAgent: "okhttp/4.12.0",
+        ip: "198.51.100.9",
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    expect(await res.json()).toMatchObject({
+      matched: true,
+      matchType: "probabilistic",
+      path: "/x",
+    });
   });
 });

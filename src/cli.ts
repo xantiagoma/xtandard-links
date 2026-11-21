@@ -328,7 +328,7 @@ Commands:
                                 Clicks, leads and sales (daily) + top countries/referrers.
   qr <url|slug> [-o code.svg] [--size <px>]
                                 QR code SVG for a URL or a link's short URL (+ ?qr=1).
-  prune                         Drop expired click refs and deferred deep-link handoffs.
+  prune                         Drop expired click refs, deferred handoffs and KV analytics buckets.
 
 Common options:
   --tenant, -t <key>            Tenant (default: $TENANT or "default").
@@ -360,6 +360,7 @@ Environment variables
     AUTH_PASSWORD_HASH          scrypt hash (preferred; see docs/AUTH.md).
     AUTH_PASSWORD               Plaintext password (dev only).
     VIEWER_SECRET               Enables analytics viewer tokens (lvt_… bearer tokens).
+    VISITOR_SALT                Shared salt for visitor hashes (set it when running several instances).
 
 Examples:
   # Local panel + redirects (file storage, no auth): http://localhost:3000/links
@@ -541,6 +542,14 @@ export async function run(argv: string[]): Promise<number> {
         const core = await makeCore();
         const result = await core.prune();
         out(`Pruned ${result.clickRefs} click refs and ${result.deferred} deferred handoffs.\n`);
+        // The default KV rollup sink keeps hourly buckets for a bounded window.
+        const analytics = core.analytics as {
+          prune?: () => Promise<{ buckets: number; events: number }>;
+        };
+        if (typeof analytics.prune === "function") {
+          const rollups = await analytics.prune();
+          out(`Pruned ${rollups.buckets} analytics buckets and ${rollups.events} recent events.\n`);
+        }
         return 0;
       }
       case "serve":
@@ -748,9 +757,13 @@ async function serve(flags: Flags): Promise<number> {
     ...(viewerSecret ? { portal: { secret: viewerSecret } } : {}),
     ...(redirectBasePath ? { redirectBasePath } : {}),
   });
+  const visitorSalt = env("VISITOR_SALT");
   const redirects = createRedirectHandler({
     core,
     defaultDomain,
+    // A shared salt keeps unique visitors, A/B stickiness and deferred fingerprints stable
+    // across instances and restarts (the default is random per process).
+    ...(visitorSalt ? { privacy: { salt: visitorSalt } } : {}),
     ...(redirectBasePath ? { basePath: redirectBasePath } : {}),
   });
   // Make sure the default domain exists so the first link works out of the box.

@@ -136,7 +136,7 @@ export default app;
 Open `http://localhost:3000/links` for the dashboard. With no `auth` the panel is open — fine on
 localhost, not in production: see [Auth](docs/AUTH.md) and [Authorization](docs/AUTHORIZATION.md).
 
-Prefer no code? `bunx @xtandard/links serve --storage file:./data` runs the same panel and
+Prefer no code? `STORAGE_DRIVER=sqlite bunx @xtandard/links serve` runs the same panel and
 redirects, or use the Docker image (see [Deployment](docs/DEPLOYMENT.md)).
 
 ## Create your first link
@@ -309,18 +309,18 @@ the actions you allow. See [Analytics widget](docs/WIDGET.md) and
 Links, domains and attribution data live behind a four-method KV contract. Every driver passes the
 same conformance suite; the redirect plane caches on top of whichever you pick.
 
-| Driver        | Import                                  | Watch (instant cache eviction) | Compare-and-swap |
-| ------------- | --------------------------------------- | ------------------------------ | ---------------- |
-| Memory        | `@xtandard/links/storage/memory`        | ✓                              | ✓                |
-| File (JSON)   | `@xtandard/links/storage/file`          | ✓                              | —                |
-| Redis         | `@xtandard/links/storage/redis`         | ✓ (keyspace events)            | ✓                |
-| Postgres      | `@xtandard/links/storage/postgres`      | ✓ (LISTEN/NOTIFY)              | ✓                |
-| Drizzle       | `@xtandard/links/storage/drizzle`       | via `withWatch`                | ✓ (pg, sqlite)   |
-| MongoDB       | `@xtandard/links/storage/mongodb`       | ✓ (change streams)             | ✓                |
-| SQLite        | `@xtandard/links/storage/sqlite`        | —                              | ✓                |
-| libSQL/Turso  | `@xtandard/links/storage/libsql`        | —                              | ✓                |
-| unstorage     | `@xtandard/links/storage/unstorage`     | via unstorage                  | —                |
-| Cloudflare KV | `@xtandard/links/storage/cloudflare-kv` | —                              | —                |
+| Driver        | Import                                  | Watch (instant cache eviction)     | Compare-and-swap |
+| ------------- | --------------------------------------- | ---------------------------------- | ---------------- |
+| Memory        | `@xtandard/links/storage/memory`        | ✓                                  | ✓                |
+| File (JSON)   | `@xtandard/links/storage/file`          | ✓                                  | —                |
+| Redis         | `@xtandard/links/storage/redis`         | ✓ (keyspace events)                | ✓                |
+| Postgres      | `@xtandard/links/storage/postgres`      | via `withWatch` + `pgListenNotify` | ✓                |
+| Drizzle       | `@xtandard/links/storage/drizzle`       | via `withWatch`                    | ✓ (pg, sqlite)   |
+| MongoDB       | `@xtandard/links/storage/mongodb`       | via `withWatch`                    | ✓                |
+| SQLite        | `@xtandard/links/storage/sqlite`        | —                                  | ✓                |
+| libSQL/Turso  | `@xtandard/links/storage/libsql`        | —                                  | ✓                |
+| unstorage     | `@xtandard/links/storage/unstorage`     | via `withWatch`                    | —                |
+| Cloudflare KV | `@xtandard/links/storage/cloudflare-kv` | —                                  | —                |
 
 See [Storage](docs/STORAGE.md) and [ADR 0005](docs/ADR/0005-storage-kv-contract.md).
 
@@ -372,14 +372,15 @@ More in [UI](docs/UI.md).
 ## CLI
 
 ```sh
-bunx @xtandard/links serve --storage sqlite:./links.db --domain go.acme.com
+STORAGE_DRIVER=sqlite bunx @xtandard/links serve --domain go.acme.com
 bunx @xtandard/links links create https://acme.com/pricing --slug pricing --tag launch
 bunx @xtandard/links import bitly-export.csv --format bitly
 bunx @xtandard/links stats default --days 30
 bunx @xtandard/links qr https://go.acme.com/pricing -o pricing.svg
 ```
 
-Every command takes the same `--storage` flag. See [CLI](docs/CLI.md).
+Every command reads its storage from the same environment variables (`STORAGE_DRIVER`,
+`STORAGE_SQLITE_PATH`, `REDIS_URL`, …). See [CLI](docs/CLI.md).
 
 ## Testing
 

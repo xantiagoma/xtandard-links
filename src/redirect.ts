@@ -124,7 +124,7 @@ export interface RedirectHandler {
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 function page(title: string, body: string, status: number, extraHead = ""): Response {
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)}</title>${extraHead}<style>:root{color-scheme:light dark;--bg:#fafafa;--fg:#18181b;--muted:#71717a;--card:#fff;--line:#e4e4e7;--accent:#0d9488}@media (prefers-color-scheme:dark){:root{--bg:#09090b;--fg:#fafafa;--muted:#a1a1aa;--card:#18181b;--line:#27272a;--accent:#2dd4bf}}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;padding:16px}.card{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:28px}h1{font-size:18px;margin:0 0 6px}p{color:var(--muted);margin:0 0 16px}input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;font:inherit;margin-bottom:10px}button{width:100%;padding:10px;border:0;border-radius:8px;background:var(--accent);color:#fff;font:inherit;font-weight:600;cursor:pointer}.err{color:#dc2626}</style></head><body><main class="card">${body}</main></body></html>`;
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)}</title>${extraHead}<style>:root{color-scheme:light dark;--bg:#fafafa;--fg:#18181b;--muted:#71717a;--card:#fff;--line:#e4e4e7;--accent:#4d7c0f;--on-accent:#fff}@media (prefers-color-scheme:dark){:root{--bg:#09090b;--fg:#fafafa;--muted:#a1a1aa;--card:#18181b;--line:#27272a;--accent:#a3e635;--on-accent:#0f1215}}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;padding:16px}.card{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:28px}h1{font-size:18px;margin:0 0 6px}p{color:var(--muted);margin:0 0 16px}input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;font:inherit;margin-bottom:10px}button{width:100%;padding:10px;border:0;border-radius:8px;background:var(--accent);color:var(--on-accent);font:inherit;font-weight:600;cursor:pointer}.err{color:#dc2626}</style></head><body><main class="card">${body}</main></body></html>`;
   return new Response(html, {
     status,
     headers: {
@@ -298,8 +298,9 @@ export function createRedirectHandler(options: RedirectHandlerOptions): Redirect
 
   /**
    * `POST /_links/deferred/claim` — the app's first-open call (ADR 0008). Body
-   * `{ clickId? }`: exact match by click id (install referrer / pasteboard),
-   * otherwise a probabilistic match on the request's fingerprint.
+   * `{ clickId?, platform?: "ios" | "android" }`: exact match by click id (install
+   * referrer / pasteboard), otherwise a probabilistic match on the request's
+   * fingerprint (IP + platform; `platform` overrides the user-agent guess).
    */
   async function claimDeferred(request: Request): Promise<Response> {
     const json = (body: unknown, status = 200) =>
@@ -308,14 +309,19 @@ export function createRedirectHandler(options: RedirectHandlerOptions): Redirect
         headers: { "content-type": "application/json", "cache-control": "no-store" },
       });
     let clickId: string | undefined;
+    let platform: string | undefined;
     try {
       const text = await request.text();
-      const body = text ? (JSON.parse(text) as { clickId?: unknown }) : {};
+      const body = text ? (JSON.parse(text) as { clickId?: unknown; platform?: unknown }) : {};
       if (typeof body.clickId === "string" && body.clickId) clickId = body.clickId;
+      if (body.platform === "ios" || body.platform === "android") platform = body.platform;
     } catch {
       return json({ error: "invalid JSON body" }, 400);
     }
+    // Native HTTP clients (okhttp, CFNetwork) often send user agents without an OS name;
+    // the app may state its platform explicitly.
     const ua = parseUa(request.headers.get("user-agent") ?? "");
+    if (platform) ua.os = platform;
     const fingerprint = clickId
       ? undefined
       : await deferredFingerprint({
@@ -339,7 +345,12 @@ export function createRedirectHandler(options: RedirectHandlerOptions): Redirect
     });
   }
 
-  async function handle(request: Request, ctx?: RedirectContext): Promise<Response | null> {
+  async function handle(request: Request, rawCtx?: RedirectContext): Promise<Response | null> {
+    // Call waitUntil as a method: a Workers ExecutionContext throws "Illegal invocation"
+    // when its waitUntil is detached from the object.
+    const ctx: RedirectContext | undefined = rawCtx?.waitUntil
+      ? { waitUntil: (p) => rawCtx.waitUntil?.(p) }
+      : rawCtx;
     let resolvedLink: Link | null = null;
     try {
       const method = request.method.toUpperCase();
