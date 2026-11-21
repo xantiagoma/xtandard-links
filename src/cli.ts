@@ -108,9 +108,12 @@ async function describeStorage(): Promise<string> {
   }
 }
 
+/** `AUTH_MODE`, with an empty value meaning the default `none`. */
+const authModeFromEnv = (): string => process.env.AUTH_MODE || "none";
+
 /** Build the auth + authorization providers from env (mirrors the standalone app). */
 async function buildAuth(): Promise<{ auth: AuthProvider; authorization: AuthorizationProvider }> {
-  const mode = env("AUTH_MODE", "none");
+  const mode = authModeFromEnv();
   if (mode === "basic") {
     const [{ basicAuth }, { rolesAuthorization }] = await Promise.all([
       import("./auth/basic.ts"),
@@ -138,6 +141,7 @@ async function buildAuth(): Promise<{ auth: AuthProvider; authorization: Authori
       authorization: rolesAuthorization({}),
     };
   }
+  if (mode !== "none") throw new Error(`Unknown AUTH_MODE "${mode}" (expected none or basic)`);
   const [{ noAuth }, { noAuthorization }] = await Promise.all([
     import("./auth/none.ts"),
     import("./authorization/none.ts"),
@@ -355,7 +359,7 @@ Environment variables
     TITLE                       Navbar wordmark.
     LOGO_URL                    Logo image URL.
     READONLY        1|true      Block all mutating operations.
-    AUTH_MODE       none|basic  Authentication mode (default none).
+    AUTH_MODE       none|basic  Authentication mode (default none; any other value is rejected).
     AUTH_USERNAME   admin       Username for basic auth.
     AUTH_PASSWORD_HASH          scrypt hash (preferred; see docs/AUTH.md).
     AUTH_PASSWORD               Plaintext password (dev only).
@@ -729,7 +733,7 @@ async function serve(flags: Flags): Promise<number> {
   const title = env("TITLE", "@xtandard/links");
   const logoUrl = env("LOGO_URL");
   const readonly = isTruthy(env("READONLY"));
-  const authMode = env("AUTH_MODE", "none");
+  const authMode = authModeFromEnv();
   const viewerSecret = env("VIEWER_SECRET") || env("PORTAL_SECRET");
   const redirectBasePath = env("REDIRECT_BASE_PATH");
 
@@ -739,8 +743,9 @@ async function serve(flags: Flags): Promise<number> {
       import("./redirect.ts"),
       import("./server/base-path.ts"),
     ]);
-  const storage = await buildStorage();
+  // Auth first: an unknown AUTH_MODE fails before storage connects or anything listens.
   const { auth, authorization } = await buildAuth();
+  const storage = await buildStorage();
   if (authMode === "none") {
     err("[xtandard/links] AUTH_MODE=none — do NOT expose this publicly without authentication.\n");
   }
