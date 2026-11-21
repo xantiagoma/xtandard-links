@@ -2,7 +2,7 @@
 import os, sys
 from mark import *
 from icon import icon
-from text import outline, x_height
+from text import ink_bounds, outline, x_height
 
 FONTS = os.environ["BRAND_FONTS"]
 URBANIST = os.path.join(FONTS, "Urbanist.ttf")
@@ -50,20 +50,10 @@ write("favicon.svg", favicon())
 g, _ = symbol_group(GH, 0, 0, "url(#lime)", "s")
 write("symbol.svg", svg(GW, GH, g, lime_gradient("lime")))
 
-# The full mark without the tile: brackets + X + chain on a transparent background, in a
-# light-surface and a dark-surface variant. Used wherever the mark stands alone on a page
-# (the docs-site hero); the tile is kept only for app-icon shapes (favicons, social card).
-def mark(theme):
-    x0, x1 = 168 - 17 - 8, max(920 + 17, bx1) + 8
-    y0, y1 = min(by0, 440 - 17) - 8, max(by1, 584 + 17) + 8
-    bracket = "#9AA1A9" if theme == "light" else "#5A6067"
-    stops = LIME_ON_LIGHT if theme == "light" else LIME
-    body = (f'<g transform="translate({-x0:.1f} {-y0:.1f})">{brackets(bracket)}'
-            f'{glyph("url(#lime)", uid="m" + theme)}</g>')
-    return svg(x1 - x0, y1 - y0, body, lime_gradient("lime", stops=stops))
-
-write("mark-light.svg", mark("light"))
-write("mark-dark.svg", mark("dark"))
+# symbol.svg: lime for dark surfaces; symbol-light.svg: the light lockups' deeper lime, so the
+# bare symbol reads on white. The UI navbar shows one per theme (no tile anywhere on a page).
+g_light, _ = symbol_group(GH, 0, 0, "url(#lime)", "sl")
+write("symbol-light.svg", svg(GW, GH, g_light, lime_gradient("lime", stops=LIME_ON_LIGHT)))
 
 # --- lockups -------------------------------------------------------------------
 XH = x_height(URBANIST, 900)
@@ -79,7 +69,11 @@ def wordmark(size, x, baseline, prefix_fill, word_paint, stacked=False):
 def horizontal(theme, mono=None):
     sym_h = 96
     size = (sym_h * 0.5) / XH  # x-height = half the symbol height
-    baseline = sym_h * 0.86
+    # Vertical centring (same rule in every xtandard repo): the symbol's centre sits on the
+    # wordmark's optical centre, the middle of the inked height from the top of the tallest
+    # ascender/cap down to the baseline (descenders ignored).
+    top, _bottom = ink_bounds("xtandard-links", URBANIST, 900, size, tracking=-0.012)
+    baseline = sym_h / 2 - top / 2
     gap = 30
     if mono:
         sym, sw = symbol_group(sym_h, 0, 0, mono, f"h{mono[1:]}")

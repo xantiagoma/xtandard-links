@@ -26,29 +26,28 @@ dark variants) on a transparent background: the rounded tile appears only where 
 shape is expected (favicons, Apple touch icon, social card). Rasters exist only where a format requires one and nobody sees them as an on-page
 logo: the social card and the `<head>` icon fallbacks.
 
-| File                                                   | What it is                                                                                           | Use it for                                                                                       |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `logo.svg`                                             | App icon: the mark on the near-black tile with brackets, orbit lines and a soft shadow               | The master for app-icon shapes only (Apple touch icon, avatars); never shown as a logo on a page |
-| `mark-light.svg`, `mark-dark.svg`                      | The full mark without the tile — brackets, X and chain — on transparent, for light and dark surfaces | The docs-site hero (theme-aware) and any standalone mark on a page                               |
-| `symbol.svg`                                           | The X + chain alone, transparent                                                                     | Inline UI (the admin navbar, inlined by `BrandMark`), places that draw their own surface         |
-| `lockup-horizontal-dark.svg`                           | Symbol + wordmark, `xtandard-` in near-white                                                         | Headers on dark backgrounds (README in GitHub dark mode, the docs site in dark mode)             |
-| `lockup-horizontal-light.svg`                          | Symbol (deeper lime) + wordmark, `xtandard-` in ink                                                  | Headers on light backgrounds (README in light mode, npm, the docs site)                          |
-| `lockup-stacked-{dark,light}.svg`                      | Symbol left, `xtandard-` over `links`                                                                | Square-ish slots: slides, sidebars, stickers                                                     |
-| `monochrome-white.svg`, `monochrome-black.svg`         | One-colour horizontal lockup                                                                         | Photos and busy backgrounds (white); one-colour print (black)                                    |
-| `favicon.svg`                                          | The tile + mark without orbit, brackets and shadow, with a bolder chain that survives 16 px          | Browser tabs (the primary icon)                                                                  |
-| `favicon.ico` (16/32/48), `apple-touch-icon.png` (180) | Raster fallbacks of the favicon / icon                                                               | `<head>` only: browsers without SVG favicons, iOS home screens                                   |
-| `social.svg` → `social.png` (1280×640)                 | Social card: icon, wordmark, tagline, `bun add` line                                                 | `og:image`/`twitter:image` (must be raster) and the GitHub social preview                        |
+| File                                                   | What it is                                                                                  | Use it for                                                                                       |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `logo.svg`                                             | App icon: the mark on the near-black tile with brackets, orbit lines and a soft shadow      | The master for app-icon shapes only (Apple touch icon, avatars); never shown as a logo on a page |
+| `symbol.svg`, `symbol-light.svg`                       | The X + chain alone, transparent; bright lime for dark surfaces, deeper lime for light ones | The admin UI / widget / React embed navbar (one per theme, inlined by `BrandMark`)               |
+| `lockup-horizontal-dark.svg`                           | Symbol + wordmark, `xtandard-` in near-white                                                | Headers on dark backgrounds (README in GitHub dark mode, the docs site in dark mode)             |
+| `lockup-horizontal-light.svg`                          | Symbol (deeper lime) + wordmark, `xtandard-` in ink                                         | Headers on light backgrounds (README in light mode, npm, the docs site)                          |
+| `lockup-stacked-{dark,light}.svg`                      | Symbol left, `xtandard-` over `links`                                                       | Square-ish slots: slides, sidebars, stickers                                                     |
+| `monochrome-white.svg`, `monochrome-black.svg`         | One-colour horizontal lockup                                                                | Photos and busy backgrounds (white); one-colour print (black)                                    |
+| `favicon.svg`                                          | The tile + mark without orbit, brackets and shadow, with a bolder chain that survives 16 px | Browser tabs (the primary icon)                                                                  |
+| `favicon.ico` (16/32/48), `apple-touch-icon.png` (180) | Raster fallbacks of the favicon / icon                                                      | `<head>` only: browsers without SVG favicons, iOS home screens                                   |
+| `social.svg` → `social.png` (1280×640)                 | Social card: icon, wordmark, tagline, `bun add` line                                        | `og:image`/`twitter:image` (must be raster) and the GitHub social preview                        |
 
 ### Where each file goes
 
 - **README header**: a `<picture>` choosing `lockup-horizontal-dark.svg` / `-light.svg` with
   `prefers-color-scheme`. The README ships to npm, which does not ship `docs/`, so the header uses
   absolute `raw.githubusercontent.com` URLs (served as `image/svg+xml`).
-- **Docs site** (`site/`): the light/dark lockup SVGs as the Starlight logo, `mark-light.svg` /
-  `mark-dark.svg` in the hero (theme-aware, no tile),
+- **Docs site** (`site/`): the horizontal light/dark lockups as the Starlight logo, the stacked
+  light/dark lockups as the home hero (theme-aware, no tile),
   `favicon.svg` (+ `favicon.ico` and `apple-touch-icon.png` fallbacks) in the head, `social.png` as
   `og:image`/`twitter:image`.
-- **Admin UI and analytics widget** (`src/ui/`): `symbol.svg` inlined in the navbar next to the title
+- **Admin UI and analytics widget** (`src/ui/`): `symbol-light.svg` / `symbol.svg` inlined in the navbar next to the title
   (unless the host passes `logoUrl`), the favicon set in `index.html`. The React embeds render the same
   inline SVG and no favicon.
 - **Avatars and registries** that only accept rasters (GitHub repository picture, GHCR): export one
@@ -96,6 +95,11 @@ Icon space is 1024 × 1024, corner radius 224 (21.9%), the family's tile, rim, o
   crossings each ring passes under the other once (9-unit cut), so the links interlock. The favicon
   uses a 44-unit stroke and a 13-unit cut.
 - **Brackets**: `<` and `>` 34-unit strokes in `xl-orbit`, centred vertically at x 168–232 and 856–920.
+
+**Horizontal lockups**: the symbol's vertical centre sits on the wordmark's optical centre — the
+middle of the inked height from the top of the tallest ascender/cap to the baseline (descenders
+ignored) — with a 30-unit gap (at a 96-unit symbol height). The same rule applies across the
+xtandard repositories.
 
 **Clear space**: a ring's width (about 10% of the symbol's height) on every side of the symbol or a
 lockup; 10% of the tile's width outside the app icon.

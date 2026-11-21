@@ -14,7 +14,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 a=docs/assets
-copies='site/public:favicon.svg site/public:favicon.ico site/public:apple-touch-icon.png site/public:social.png site/public:symbol.svg src/ui/public:favicon.svg src/ui/public:favicon.ico src/ui/public:apple-touch-icon.png src/ui/public:symbol.svg'
+copies='site/public:favicon.svg site/public:favicon.ico site/public:apple-touch-icon.png site/public:social.png site/public:symbol.svg src/ui/public:favicon.svg src/ui/public:favicon.ico src/ui/public:apple-touch-icon.png src/ui/public:symbol.svg src/ui/public:symbol-light.svg'
 
 # Rasters exist only where a format requires one and nobody sees it as an on-page logo:
 # the social card (og:image must be raster) and the <head> icon fallbacks. Every logo, symbol
