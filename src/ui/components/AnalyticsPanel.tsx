@@ -466,7 +466,6 @@ export function AnalyticsPanel({
   }));
   const active = filterEntries(filters);
   // Leads and sales carry only link + domain, so visitor-dimension filters zero them out.
-  const visitorFilter = active.some(([dim]) => dim !== "link" && dim !== "domain");
 
   const cards: { title: string; tabs: BreakdownTab[] }[] = [
     ...(showLinkBreakdown
@@ -586,11 +585,6 @@ export function AnalyticsPanel({
             series={series(key)}
             selected={metric === key}
             onSelect={() => update({ metric: key })}
-            unavailable={
-              visitorFilter && (key === "leads" || key === "sales" || key === "saleAmount")
-                ? "Conversions aren't broken down by visitor filters."
-                : undefined
-            }
           />
         ))}
       </div>
