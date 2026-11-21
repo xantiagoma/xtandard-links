@@ -5,8 +5,9 @@
  * password and link-preview pages.
  *
  * `handle(request, ctx?)` returns `null` when the request is not for a short
- * link (unknown host, reserved path, outside `basePath`) so hosts can fall
- * through to their own router; `fetch` always answers (404 instead of `null`).
+ * link (unknown host, reserved path, outside `basePath`, or an unknown slug on a
+ * domain without `notFoundUrl`) so hosts can fall through to their own router;
+ * `fetch` always answers (the 404 page instead of `null`).
  * Neither ever throws.
  *
  * Edge-safe: no optional dependencies; pass `ctx.waitUntil` on Workers /
@@ -382,7 +383,9 @@ export function createRedirectHandler(options: RedirectHandlerOptions): Redirect
       if (!link || link.disabled) {
         if (method === "POST") return null;
         if (lookupDomain?.notFoundUrl) return redirect(lookupDomain.notFoundUrl);
-        return render({ kind: "not-found", host: lookupHost, slug }, request);
+        // Not a link: fall through so a host sharing this domain keeps its own routes.
+        // `fetch()` renders the 404 page instead.
+        return null;
       }
       resolvedLink = link;
       const now = core.now();
@@ -587,7 +590,10 @@ export function createRedirectHandler(options: RedirectHandlerOptions): Redirect
       } catch {
         // ignore
       }
-      return defaultPage({ kind: "not-found", host, slug: "" });
+      return render(
+        { kind: "not-found", host, slug: new URL(request.url).pathname.slice(1) },
+        request,
+      );
     },
     core,
     resolver,

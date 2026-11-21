@@ -16,10 +16,11 @@ Two handlers, every framework (ADR 0004). Each adapter exports:
 `linksRedirect({ core: panel.core })`.
 
 **What falls through.** The redirect handler returns "not mine" for unregistered hosts, reserved
-first segments (`api`, `_links`, `.well-known`, … — `reservedSlugs` on the core) and bare `/` without a
-`rootUrl`. An **unknown slug on a registered short domain** is answered with the 404 page (or the
-domain's `notFoundUrl`), not passed on. So when the panel and the short links share a host, route
-the panel **first** (as below), or serve it on another host.
+first segments (`api`, `_links`, `.well-known`, … — `reservedSlugs` on the core), bare `/` without a
+`rootUrl`, and **unknown slugs** — unless the domain sets `notFoundUrl`, which then answers them with
+a redirect. So the redirect middleware can sit in front of your own routes on a shared host; on a
+dedicated short domain set `notFoundUrl`, or use `fetch`, which renders the built-in 404 page.
+Routing the panel first (as below) is still the cheapest order.
 
 ## Bun
 

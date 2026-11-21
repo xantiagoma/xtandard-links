@@ -86,8 +86,8 @@ describe("hono adapter", () => {
     app.get("/about", (c) => c.text("about"));
     const hit = await app.request(clickRequest("https://sho.rt/hello"));
     expect(hit.status).toBe(302);
-    // Unknown slug on a registered short domain: the redirect handler's 404 page.
-    expect((await app.request("https://sho.rt/about")).status).toBe(404);
+    // Unknown slug on a registered short domain without notFoundUrl: falls through to the host.
+    expect(await (await app.request("https://sho.rt/about")).text()).toBe("about");
     const own = await app.request("https://app.test/about");
     expect(await own.text()).toBe("about");
     await middleware.handler.close();
