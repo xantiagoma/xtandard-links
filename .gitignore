@@ -40,3 +40,9 @@ examples/**/node_modules
 examples/**/.links
 examples/receivers/python/.venv
 examples/receivers/python/__pycache__
+examples/**/*.db
+examples/**/.next
+examples/**/next-env.d.ts
+examples/**/tsconfig.tsbuildinfo
+examples/**/.wrangler
+examples/**/.dev.vars

@@ -1,0 +1,42 @@
+{
+  // In-repo editor/typecheck support for the examples: maps the `@xtandard/links/*`
+  // import strings to the local source so they resolve without `bun install` or a
+  // build. The examples still depend on the package via `file:../..` at runtime
+  // (`bun install` in an example links it); when copied out, install the published
+  // package and drop these paths.
+  //
+  // Keep in sync with `exports` in ../package.json: every new subpath needs a line here.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "noEmit": true,
+    "types": ["bun"],
+    "paths": {
+      "@xtandard/links": ["../src/index.ts"],
+      "@xtandard/links/core": ["../src/core.ts"],
+      "@xtandard/links/schema": ["../src/schema.ts"],
+      "@xtandard/links/redirect": ["../src/redirect.ts"],
+      "@xtandard/links/client": ["../src/client.ts"],
+      "@xtandard/links/deeplinks": ["../src/deeplinks.ts"],
+      "@xtandard/links/qr": ["../src/qr.ts"],
+      "@xtandard/links/import": ["../src/import.ts"],
+      "@xtandard/links/testing": ["../src/testing.ts"],
+      "@xtandard/links/storage/*": ["../src/entry-storage-*.ts"],
+      "@xtandard/links/drizzle/*": ["../src/entry-drizzle-*.ts"],
+      "@xtandard/links/analytics/*": ["../src/entry-analytics-*.ts"],
+      "@xtandard/links/auth/*": ["../src/entry-auth-*.ts"],
+      "@xtandard/links/authorization/*": ["../src/entry-authorization-*.ts"],
+      "@xtandard/links/hooks/*": ["../src/entry-hooks-*.ts"],
+      "@xtandard/links/bridges/*": ["../src/entry-bridges-*.ts"],
+      "@xtandard/links/elysia": ["../src/entry-elysia.ts"],
+      "@xtandard/links/elysia2": ["../src/entry-elysia2.ts"],
+      "@xtandard/links/hono": ["../src/entry-hono.ts"],
+      "@xtandard/links/express": ["../src/entry-express.ts"],
+      "@xtandard/links/bun": ["../src/entry-bun.ts"],
+      "@xtandard/links/next": ["../src/entry-next.ts"],
+      "@xtandard/links/react": ["../src/react.tsx"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["**/node_modules/**"]
+}

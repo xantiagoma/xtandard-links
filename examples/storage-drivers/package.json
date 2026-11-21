@@ -1,0 +1,15 @@
+{
+  "name": "example-storage-drivers",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@libsql/client": "0.15.15",
+    "@xtandard/links": "file:../..",
+    "mongodb": "^6.10.0",
+    "pg": "^8.13.0",
+    "redis": "^5.0.0"
+  }
+}
