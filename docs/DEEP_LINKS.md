@@ -110,13 +110,16 @@ On first launch the app makes one call to the short domain:
 POST https://go.acme.com/_links/deferred/claim
 Content-Type: application/json
 
-{ "clickId": "clk_01J…" }
+{ "clickId": "clk_01J…", "platform": "android" }
 ```
 
 - **Exact match**: send `clickId` when you have it (Android, from the install referrer).
-- **Probabilistic match**: send `{}`. The server computes the fingerprint of the calling request
-  (its IP and the OS family parsed from its `User-Agent`) and claims the newest unclaimed handoff
-  with the same fingerprint inside the window.
+- **Probabilistic match**: omit `clickId`. The server computes the fingerprint of the calling
+  request (its IP and the platform) and claims the newest unclaimed handoff with the same
+  fingerprint inside the window.
+- **`platform`** (`"ios"` or `"android"`): always send it. Native HTTP clients (`okhttp`,
+  `CFNetwork`) often send user agents without an OS name, so the server's guess from the
+  `User-Agent` can miss; an explicit `platform` overrides it.
 
 ```json
 {
@@ -125,12 +128,14 @@ Content-Type: application/json
   "clickId": "clk_01J…",
   "linkId": "lnk_01J…",
   "path": "/product/42",
-  "url": "https://apps.apple.com/app/id123456789"
+  "url": "https://acme.com/product/42"
 }
 ```
 
 No match is `404 { "matched": false }`. A handoff can be claimed **once**. `path` is
-`deepLink.path` (`/` when unset) and `url` is where the visitor was redirected. The endpoint lives
+`deepLink.path` (`/` when unset) and `url` is the link's web destination, never the store listing:
+`link.url` with its UTM (and click id) when the visitor was sent to a store, otherwise the URL they
+were redirected to. Apps that route by URL can use it instead of `path`. The endpoint lives
 under the redirect handler's `basePath` when it has one (`/l/_links/deferred/claim`), needs no
 auth, and is answered on registered domains (and, with `basePath`, on any host).
 
@@ -141,10 +146,8 @@ What makes the probabilistic match work, and what breaks it:
   Set `privacy: { salt }` on every redirect handler ([Analytics](ANALYTICS.md#privacy)).
 - **A client IP.** Behind a proxy, make sure `getIp` sees the visitor's address (the default reads
   `CF-Connecting-IP`, `X-Real-IP`, `X-Forwarded-For`, …). No IP, no fingerprint.
-- **The OS family must parse.** The click came from a mobile browser (`ios` / `android`); the claim
-  comes from your app's HTTP client. iOS `URLSession` sends `…CFNetwork/… Darwin/…`, which parses
-  as `ios`. Android HTTP clients (`okhttp/…`, `Dalvik/…`) do not say "Android" reliably: set a
-  `User-Agent` that contains `Android` on the claim request.
+- **The platform must match.** The click came from a mobile browser (`ios` / `android`); send the
+  same value as `platform` from the app.
 - **Same network.** Switching from Wi-Fi to cellular between tap and first open changes the IP.
   Probabilistic matches are labelled `matchType: "probabilistic"`: treat them as a good guess (for
   example, open the screen but do not apply a discount that only the link's audience should get).
@@ -173,8 +176,8 @@ func claimDeferredDeepLink() async -> DeferredLink? {
     var request = URLRequest(url: URL(string: "https://go.acme.com/_links/deferred/claim")!)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.httpBody = Data("{}".utf8) // probabilistic: there is no install referrer on iOS
-    // URLSession's default User-Agent ("MyApp/1 CFNetwork/… Darwin/…") parses as iOS.
+    // Probabilistic: iOS has no install referrer, so no click id.
+    request.httpBody = Data(#"{"platform":"ios"}"#.utf8)
 
     guard let (data, response) = try? await URLSession.shared.data(for: request),
           (response as? HTTPURLResponse)?.statusCode == 200,
@@ -235,9 +238,10 @@ suspend fun claimDeferredDeepLink(context: Context): String? {
             conn.requestMethod = "POST"
             conn.doOutput = true
             conn.setRequestProperty("Content-Type", "application/json")
-            // Must contain "Android" for the probabilistic fallback to match the click's OS.
-            conn.setRequestProperty("User-Agent", "AcmeApp/1.0 (Linux; Android ${android.os.Build.VERSION.RELEASE})")
-            val body = JSONObject().apply { if (clickId != null) put("clickId", clickId) }
+            val body = JSONObject().apply {
+                put("platform", "android") // the probabilistic fallback matches on IP + platform
+                if (clickId != null) put("clickId", clickId)
+            }
             conn.outputStream.use { it.write(body.toString().toByteArray()) }
             if (conn.responseCode != 200) return@withContext null
             val json = JSONObject(conn.inputStream.bufferedReader().readText())

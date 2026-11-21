@@ -165,8 +165,10 @@ const { breakdown } = await core.queryAnalytics({
 // [{ key: "lnk_…", clicks: 812, leads: 37, sales: 9, saleAmount: 44100, … }, …]
 ```
 
-Conversion events carry only the `link` and `domain` dimensions (country, device and the others
-read `"(none)"` for them), so "sales by country" needs your own join on the click id.
+Conversion events carry the dimensions of the click they are attributed to (country, continent,
+city, device, OS, browser, referrer, QR, A/B variant, UTM), copied from its click ref, so "sales by
+country" or "leads per variant" is a plain `groupBy`. A conversion whose click ref was already
+pruned reads `"(none)"` for them.
 
 `lead.created` and `sale.created` are `after` hook events ([Hooks](HOOKS.md)): forward them to your
 CRM, or publish them as webhooks with `@xtandard/links/bridges/webhooks`.

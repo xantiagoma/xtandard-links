@@ -134,9 +134,22 @@ const adrs: [file: string, label: string][] = [
   ["0012-slugs.md", "0012 · Slugs"],
 ];
 
-/** The changelog page exists once the first release has written CHANGELOG.md. */
-const changelog: Item[] = existsSync(join(repoRoot, "CHANGELOG.md"))
-  ? [{ slug: "project/changelog", src: "CHANGELOG.md", label: "Changelog" }]
+/**
+ * The changelog page, and the README's "Project status" section (which links to it), exist once
+ * the first release has written CHANGELOG.md.
+ */
+const hasChangelog = existsSync(join(repoRoot, "CHANGELOG.md"));
+const changelog: Item[] = hasChangelog
+  ? [
+      {
+        slug: "project/status",
+        src: "README.md",
+        sections: ["Project status"],
+        title: "Project status",
+        label: "Project status",
+      },
+      { slug: "project/changelog", src: "CHANGELOG.md", label: "Changelog" },
+    ]
   : [];
 
 export const sidebar: Item[] = [
@@ -171,6 +184,7 @@ export const sidebar: Item[] = [
         title: "A tour of the features",
         label: "Feature tour",
       },
+      { slug: "guides/examples", src: "examples/README.md", label: "Examples" },
       {
         slug: "guides/subpath-exports",
         src: "README.md",
@@ -217,6 +231,13 @@ export const sidebar: Item[] = [
     items: [
       { slug: "ui/widget", src: "docs/WIDGET.md", label: "Analytics widget" },
       { slug: "ui/admin", src: "docs/UI.md", label: "Admin UI & React embeds" },
+      {
+        slug: "ui/screenshots",
+        src: "README.md",
+        sections: ["Screenshots"],
+        title: "Screenshots",
+        label: "Screenshots",
+      },
     ],
   },
   {
