@@ -55,7 +55,7 @@ const nonCode = (key: string) =>
  * instead of failing the build. Every other missing source fails loudly. Empty this list once
  * the work has landed.
  */
-const pendingEntries = new Set(["./react"]);
+const pendingEntries = new Set<string>();
 
 /**
  * Every public entry point, in package.json `exports` order. The source file follows the build's
