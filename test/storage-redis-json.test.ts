@@ -54,12 +54,12 @@ function fakeClient() {
 describe("createRedisJSONStorage (fake client)", () => {
   test("stores values via JSON.SET at the root path, prefixed", async () => {
     const { client, jsonStore } = fakeClient();
-    const storage = createRedisJSONStorage({ client, prefix: "app:webhooks" });
+    const storage = createRedisJSONStorage({ client, prefix: "app:links" });
     const value = { url: "https://x.example", nested: { tags: ["a"] } };
     await storage.setItem("lnk/t/acme/links/lnk_1", value);
 
     // Native JSON document (not a serialized string), under the namespaced key.
-    expect(jsonStore.get("app:webhooks:lnk/t/acme/links/lnk_1")).toEqual(value);
+    expect(jsonStore.get("app:links:lnk/t/acme/links/lnk_1")).toEqual(value);
     expect(await storage.getItem("lnk/t/acme/links/lnk_1")).toEqual(value);
   });
 
