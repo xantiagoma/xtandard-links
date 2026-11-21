@@ -1,0 +1,14 @@
+{
+  "name": "example-elysia",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "demo": "bun run src/demo.ts"
+  },
+  "dependencies": {
+    "@elysiajs/eden": "^1.4.0",
+    "@xtandard/links": "file:../..",
+    "elysia": "^1.4.0"
+  }
+}

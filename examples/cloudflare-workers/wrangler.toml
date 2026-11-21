@@ -1,0 +1,39 @@
+name = "xtandard-links-edge"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# The panel handler imports node:fs / node:url to serve the bundled admin UI from
+# disk. A Worker has no filesystem, so the panel runs API-only here — but the
+# imports must still resolve, which nodejs_compat provides. The redirect plane
+# (`createRedirectHandler`) has no Node dependencies.
+compatibility_flags = ["nodejs_compat"]
+
+# Links, domains, attribution refs and deferred handoffs.
+#
+# `wrangler dev` simulates KV locally (Miniflare): the ids below are placeholders
+# and are not contacted, so this works offline. Before `wrangler deploy`:
+#
+#   wrangler kv namespace create LINKS
+#   wrangler kv namespace create LINKS --preview
+#
+# and paste the returned ids into `id` / `preview_id`.
+[[kv_namespaces]]
+binding = "LINKS"
+id = "00000000000000000000000000000001"
+preview_id = "00000000000000000000000000000002"
+
+# Click, lead and sale events. Writes go through the binding; the panel's
+# analytics queries use the SQL API (CF_ACCOUNT_ID + CF_ANALYTICS_TOKEN below).
+[[analytics_engine_datasets]]
+binding = "LINKS_ANALYTICS"
+dataset = "links_events"
+
+[vars]
+# The short domain this Worker answers for (route it in the dashboard or with
+# `routes = [{ pattern = "go.acme.com", custom_domain = true }]`).
+LINKS_DOMAIN = "go.acme.com"
+
+# Secrets (wrangler secret put …):
+#   CF_ACCOUNT_ID         your account id            ┐ analytics queries in the panel API
+#   CF_ANALYTICS_TOKEN    Account Analytics: Read    ┘
+#   LINKS_ADMIN_TOKEN     bearer token required for /links/api/*

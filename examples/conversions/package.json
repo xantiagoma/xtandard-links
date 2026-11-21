@@ -1,0 +1,11 @@
+{
+  "name": "example-conversions",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@xtandard/links": "file:../.."
+  }
+}

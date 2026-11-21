@@ -314,7 +314,7 @@ export interface ClickEvent extends AnalyticsEventBase {
 }
 
 /** A lead (signup) attributed to a click (ADR 0010). */
-export interface LeadEvent extends AnalyticsEventBase {
+export interface LeadEvent extends AnalyticsEventBase, ClickDimensions {
   type: "lead";
   clickId: string;
   customerId: string;
@@ -324,7 +324,7 @@ export interface LeadEvent extends AnalyticsEventBase {
 }
 
 /** A sale attributed to a click through its customer (ADR 0010). */
-export interface SaleEvent extends AnalyticsEventBase {
+export interface SaleEvent extends AnalyticsEventBase, ClickDimensions {
   type: "sale";
   clickId: string;
   customerId: string;
@@ -341,13 +341,30 @@ export interface SaleEvent extends AnalyticsEventBase {
 export type AnalyticsEvent = ClickEvent | LeadEvent | SaleEvent;
 
 /** Minimal click record kept in storage for attribution (pruned after the window). */
-export interface ClickRef {
+export interface ClickRef extends ClickDimensions {
   clickId: string;
   tenant: string;
   linkId: string;
   domain: string;
   slug: string;
   at: string;
+}
+
+/**
+ * The click's dimensions, copied onto the click ref and onto the lead/sale events it
+ * attributes, so conversions break down by country, device, referrer, … like clicks do.
+ */
+export interface ClickDimensions {
+  country?: string;
+  continent?: string;
+  city?: string;
+  device?: DeviceType;
+  os?: string;
+  browser?: string;
+  referrerHost?: string;
+  qr?: boolean;
+  variant?: string;
+  utm?: Utm;
 }
 
 /** A host customer bound to the click that brought them (first lead wins). */

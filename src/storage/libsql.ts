@@ -113,8 +113,14 @@ export function createLibsqlStorage(options: LibsqlStorageOptions): LibsqlLinksS
           ({ createClient } = (await import(specifier)) as {
             createClient: (opts: { url: string; authToken?: string }) => LibsqlClientLike;
           });
-        } catch {
-          requirePeer("@libsql/client", "storage/libsql");
+        } catch (error) {
+          if (
+            (error as { code?: string }).code === "ERR_MODULE_NOT_FOUND" ||
+            /Cannot find (module|package)/.test(String(error))
+          ) {
+            requirePeer("@libsql/client", "storage/libsql");
+          }
+          throw error;
         }
         client = createClient({ url: options.url, authToken: options.authToken });
       }

@@ -283,7 +283,12 @@ describe("redirect handler", () => {
     expect(clicks(events)[0]).toMatchObject({ id: clickId, qr: true });
     expect(await core.getClickRef(clickId ?? "")).toMatchObject({ linkId: link.id });
     const lead = await core.trackLead({ clickId: clickId ?? "", customerId: "u1" });
-    expect(lead?.event.linkId).toBe(link.id);
+    expect(lead?.event).toMatchObject({
+      linkId: link.id,
+      country: "US",
+      device: "desktop",
+      qr: true,
+    });
   });
 
   test("passQuery: false drops the short URL's query", async () => {
@@ -308,7 +313,7 @@ describe("redirect handler", () => {
     const claimed = await core.claimDeferred({ clickId });
     expect(claimed).toMatchObject({
       matchType: "exact",
-      handoff: { path: "/product/42", os: "ios" },
+      handoff: { path: "/product/42", os: "ios", url: "https://example.com/" },
     });
   });
 

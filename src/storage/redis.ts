@@ -304,7 +304,9 @@ function buildRedisStorage(
           out.push(fromRedisKey(entry));
         }
       }
-      return out;
+      // Belt and braces: the MATCH pattern is escaped, but keep only exact prefix matches
+      // (SCAN may also repeat a key across iterations).
+      return [...new Set(out)].filter((key) => key.startsWith(prefix));
     },
 
     async compareAndSwap<T>(input: { key: string; expected: T | null; next: T }): Promise<boolean> {
