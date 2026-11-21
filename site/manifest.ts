@@ -26,7 +26,9 @@ export const branch = "main";
  * domain. pages.yml passes what actions/configure-pages reports (SITE_ORIGIN, SITE_BASE), so a
  * domain change needs no code change.
  */
-export const siteOrigin = process.env.SITE_ORIGIN || "https://me.xantiagoma.com";
+const rawOrigin = process.env.SITE_ORIGIN || "https://me.xantiagoma.com";
+/** actions/configure-pages reports http://, which would leak into og:url, og:image and the sitemap. */
+export const siteOrigin = rawOrigin.replace(/^http:\/\//, "https://");
 export const siteBase = (process.env.SITE_BASE || "/xtandard-links").replace(/\/+$/, "");
 
 // ---- entry points ---------------------------------------------------------------------------
