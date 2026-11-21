@@ -55,6 +55,12 @@ export interface AnalyticsContractOptions {
   baseTime?: string | number;
   /** Per-test timeout in ms (live backends). */
   timeout?: number;
+  /**
+   * Time precision of `[from, to)`: `"exact"` (default, raw events) or `"hour"` (rollup sinks
+   * such as `analytics/kv`, which count an event when its hour lies in the window). With
+   * `"hour"`, the sub-hour boundary assertions are skipped.
+   */
+  granularity?: "exact" | "hour";
 }
 
 const H = 3_600_000;
@@ -386,6 +392,13 @@ export function runAnalyticsContractTests(
       test("[from, to) bounds: from inclusive, to exclusive", { timeout }, async () => {
         const c = await setup();
         const { c1, c2, c7, c8 } = c.f.e;
+        if (options.granularity === "hour") {
+          expect((await c.q(c.f.wide)).totals).toEqual(
+            c.m({ clicks: 7, botClicks: 1, leads: 2, sales: 2, saleAmount: 5999, uniques: 4 }),
+          );
+          expect((await c.q({ from: c.f.R.to, to: c.f.R.to })).totals).toEqual(c.m());
+          return;
+        }
         expect((await c.q({ from: c1.at, to: c2.at })).totals).toEqual(
           c.m({ clicks: 1, uniques: 1 }),
         );

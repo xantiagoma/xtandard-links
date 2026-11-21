@@ -129,14 +129,15 @@ describe("KV rollup sink", () => {
     const pruned = await sink.prune();
     expect(pruned.buckets).toBeGreaterThan(0);
     expect(pruned.events).toBe(0);
-    // Daily buckets survive the hourly retention. deleteLink drops link-scoped rollups only;
-    // tenant-wide totals keep the deleted link's clicks (documented).
+    // Daily buckets survive the hourly retention; deleteLink subtracted l2 from tenant totals.
     const q = await sink.query({
       tenant: "t",
       from: new Date(T0).toISOString(),
       to: new Date(T0 + 86_400_000).toISOString(),
+      groupBy: "link",
     });
-    expect(q.totals.clicks).toBe(2);
+    expect(q.totals.clicks).toBe(1);
+    expect(q.breakdown?.map((r) => r.key)).toEqual(["l1"]);
     const gone = await sink.query({
       tenant: "t",
       linkIds: ["l2"],

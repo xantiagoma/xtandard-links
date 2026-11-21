@@ -14,8 +14,8 @@
  * whole UTC day is inside the range and from hourly buckets at the edges. Query
  * limitations (reported via `capabilities`): no unique visitors, and at most one
  * non-link filter dimension, which cannot be combined with grouping by another
- * dimension (`crossFilter: false`). `deleteLink` drops the link's own rollups
- * and recent events; tenant-wide totals keep its historical counts.
+ * dimension (`crossFilter: false`). `deleteLink` is exact: link buckets carry
+ * every dimension, so they are subtracted from the tenant buckets.
  *
  * Key layout (under `lnk/rollup/`):
  *
@@ -138,7 +138,12 @@ function mergeBucket(into: RollupBucket, delta: RollupBucket): void {
     Record<string, Packed>,
   ][]) {
     const target = (into.d[dim] ??= {});
-    for (const [value, p] of Object.entries(values)) addPacked((target[value] ??= zero()), p);
+    for (const [value, p] of Object.entries(values)) {
+      const sum = (target[value] ??= zero());
+      addPacked(sum, p);
+      // Subtractions (deleteLink) can zero an entry out: drop it so it never shows as a row.
+      if (sum.every((x) => x === 0)) delete target[value];
+    }
   }
 }
 
@@ -314,16 +319,28 @@ export function createKvAnalytics(options: KvAnalyticsOptions): KvAnalytics {
 
       const result: AnalyticsResult = { totals: unpack(totals) };
       if (query.interval) {
-        const interval = query.interval;
-        result.timeseries = [];
-        for (const at of bucketRange(query.from, query.to, interval)) {
-          const m = zero();
+        const step = query.interval === "hour" ? 3_600_000 : 86_400_000;
+        const series = new Map(
+          bucketRange(query.from, query.to, query.interval).map((at) => [at, zero()]),
+        );
+        // Fill each series bucket from the covering rollups, so partial edge days only count
+        // the hours inside the window.
+        const sources: [AnalyticsInterval, number][] =
+          query.interval === "hour"
+            ? [...series.keys()].map((at) => ["hour", at])
+            : coveringBuckets(query.from, query.to);
+        for (const [interval, at] of sources) {
+          const target = series.get(Math.floor(at / step) * step);
+          if (!target) continue;
           for (const scope of scopes) {
             const bucket = await readBucket(query.tenant, scope, interval, at);
-            if (bucket) addPacked(m, filtered(bucket, filter));
+            if (bucket) addPacked(target, filtered(bucket, filter));
           }
-          result.timeseries.push({ at: new Date(at).toISOString(), ...unpack(m) });
         }
+        result.timeseries = [...series].map(([at, m]) => ({
+          at: new Date(at).toISOString(),
+          ...unpack(m),
+        }));
       }
       if (query.groupBy) {
         const rows: AnalyticsBreakdownRow[] = [...groups].map(([key, p]) => ({
@@ -336,26 +353,48 @@ export function createKvAnalytics(options: KvAnalyticsOptions): KvAnalytics {
     },
 
     async events(query: EventsQuery): Promise<AnalyticsEvent[]> {
-      const limit = Math.min(Math.max(query.limit ?? 50, 1), 1000);
-      const keys = (await storage.getKeys(eventsPrefix(query.tenant))).sort().reverse();
-      const out: AnalyticsEvent[] = [];
-      for (const key of keys) {
-        if (out.length >= limit) break;
-        const event = await storage.getItem<AnalyticsEvent>(key);
-        if (!event) continue;
-        if (query.before && event.at >= query.before) continue;
-        if (query.linkIds && !query.linkIds.includes(event.linkId)) continue;
-        if (query.types && !query.types.includes(event.type)) continue;
-        if (!query.includeBots && event.type === "click" && event.bot) continue;
-        out.push(event);
-      }
-      return out.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : a.id < b.id ? 1 : -1));
+      // The log is bounded (`recentEvents` per tenant), so a full scan is cheap.
+      const before = query.before === undefined ? Infinity : Date.parse(query.before);
+      const limit = Math.max(0, query.limit ?? 50);
+      const keys = await storage.getKeys(eventsPrefix(query.tenant));
+      const events = (await Promise.all(keys.map((k) => storage.getItem<AnalyticsEvent>(k))))
+        .filter((e): e is AnalyticsEvent => e !== null)
+        .filter(
+          (e) =>
+            Date.parse(e.at) < before &&
+            (!query.linkIds || query.linkIds.includes(e.linkId)) &&
+            (!query.types || query.types.includes(e.type)) &&
+            (query.includeBots || e.type !== "click" || !e.bot),
+        );
+      return events
+        .sort((a, b) =>
+          a.at < b.at ? 1 : a.at > b.at ? -1 : a.id < b.id ? 1 : a.id > b.id ? -1 : 0,
+        )
+        .slice(0, limit);
     },
 
     async deleteLink(tenant, linkId) {
-      for (const key of await storage.getKeys(
-        `${ROOT}/${enc(tenant)}/${enc(linkScope(linkId))}/`,
-      )) {
+      // Link buckets carry every dimension except `link`, so subtracting them from the
+      // matching tenant bucket removes the link's contribution exactly.
+      const prefix = `${ROOT}/${enc(tenant)}/${enc(linkScope(linkId))}/`;
+      for (const key of await storage.getKeys(prefix)) {
+        const bucket = await storage.getItem<RollupBucket>(key);
+        if (bucket) {
+          const tenantKey = `${ROOT}/${enc(tenant)}/${enc(TENANT_SCOPE)}/${key.slice(prefix.length)}`;
+          const negated: RollupBucket = {
+            m: bucket.m.map((x) => -x) as Packed,
+            d: Object.fromEntries(
+              Object.entries(bucket.d).map(([dim, values]) => [
+                dim,
+                Object.fromEntries(
+                  Object.entries(values).map(([v, p]) => [v, p.map((x) => -x) as Packed]),
+                ),
+              ]),
+            ),
+          };
+          negated.d.link = { [linkId]: negated.m.slice() as Packed };
+          await applyDelta(tenantKey, negated);
+        }
         await storage.removeItem(key);
       }
       for (const key of await storage.getKeys(eventsPrefix(tenant))) {
