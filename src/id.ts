@@ -40,7 +40,32 @@ function randomPart(length: number): string {
  * ```
  */
 export function newId(prefix: IdPrefix, now: number = Date.now()): string {
-  return `${prefix}_${encodeTime(now)}${randomPart(16)}`;
+  // Monotonic within a process: ids minted in the same (or an earlier) millisecond increment
+  // the previous random part, so creation order and sort order always agree.
+  if (now <= lastTime && lastRandom) {
+    lastRandom = increment(lastRandom);
+    return `${prefix}_${encodeTime(lastTime)}${lastRandom}`;
+  }
+  lastTime = now;
+  lastRandom = randomPart(16);
+  return `${prefix}_${encodeTime(now)}${lastRandom}`;
+}
+
+let lastTime = -1;
+let lastRandom = "";
+
+/** Base32 increment of the random part (carry overflow re-randomizes, which is astronomically rare). */
+function increment(value: string): string {
+  const chars = value.split("");
+  for (let i = chars.length - 1; i >= 0; i--) {
+    const v = ALPHABET.indexOf(chars[i] as string);
+    if (v < 31) {
+      chars[i] = ALPHABET[v + 1] as string;
+      return chars.join("");
+    }
+    chars[i] = "0";
+  }
+  return randomPart(value.length);
 }
 
 /** Regex an id of the given prefix must match. */

@@ -152,6 +152,8 @@ export type ImportConflictPolicy = "skip" | "update" | "error";
 export interface ImportRowResult {
   index: number;
   status: "created" | "updated" | "skipped" | "error";
+  /** The row as parsed (what a dry run would create or update); a password is never echoed. */
+  input: Omit<CreateLinkInput, "password"> & { hasPassword?: boolean };
   link?: Link;
   error?: string;
 }
@@ -328,6 +330,12 @@ export interface LinksCore {
   prune(): Promise<{ clickRefs: number; deferred: number }>;
   /** Flush counters and stop timers. */
   close(): Promise<void>;
+}
+
+/** An import row as echoed back in results: the plain-text password is replaced by a flag. */
+function redactInput(row: CreateLinkInput): ImportRowResult["input"] {
+  const { password, ...rest } = row;
+  return password ? { ...rest, hasPassword: true } : rest;
 }
 
 /** Strip secrets from a link for API responses: the password hash becomes `hasPassword`. */
@@ -1138,31 +1146,32 @@ export function createLinksCore(options: LinksCoreOptions): LinksCore {
             if (existing && policy === "error") throw new ConflictError("already exists");
             const status = existing ? (policy === "update" ? "updated" : "skipped") : "created";
             out[status]++;
-            out.rows.push({ index, status });
+            out.rows.push({ index, status, input: redactInput(row) });
             continue;
           }
           const existing = await findExisting(tenant, input);
           if (existing) {
             if (policy === "skip") {
               out.skipped++;
-              out.rows.push({ index, status: "skipped", link: existing });
+              out.rows.push({ index, status: "skipped", input: redactInput(row), link: existing });
               continue;
             }
             if (policy === "error") throw new ConflictError("already exists");
             const { tenant: _t, ...patch } = input;
             const link = await updateLink(tenant, existing.id, patch, opts);
             out.updated++;
-            out.rows.push({ index, status: "updated", link });
+            out.rows.push({ index, status: "updated", input: redactInput(row), link });
             continue;
           }
           const link = await createLink(input, opts);
           out.created++;
-          out.rows.push({ index, status: "created", link });
+          out.rows.push({ index, status: "created", input: redactInput(row), link });
         } catch (error) {
           out.errors++;
           out.rows.push({
             index,
             status: "error",
+            input: redactInput(row),
             error:
               error instanceof ValidationError
                 ? error.errors.map((e) => `${e.path}: ${e.message}`).join("; ")

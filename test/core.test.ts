@@ -398,3 +398,15 @@ describe("deferred deep links", () => {
     expect(await core.claimDeferred({ fingerprint: "fp1" })).toBeNull();
   });
 });
+
+describe("import echo", () => {
+  test("rows echo their input without the plain-text password", async () => {
+    const core = make();
+    const res = await core.importLinks(
+      "default",
+      [{ url: "https://a.example", slug: "p", password: "secret" }],
+      { dryRun: true },
+    );
+    expect(res.rows[0]?.input).toEqual({ url: "https://a.example", slug: "p", hasPassword: true });
+  });
+});

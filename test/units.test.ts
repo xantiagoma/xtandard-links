@@ -57,6 +57,8 @@ describe("ids, slugs, durations, passwords", () => {
     expect(idPattern("lnk").test(a)).toBe(true);
     expect(idTime(a)).toBe(1_000);
     expect(Number.isNaN(idTime("lnk_bad"))).toBe(true);
+    const burst = Array.from({ length: 50 }, () => newId("clk", 5_000));
+    expect([...burst].sort()).toEqual(burst);
   });
 
   test("slug normalization, validation and generation", () => {
