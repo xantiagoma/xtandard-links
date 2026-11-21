@@ -97,6 +97,12 @@ export {
   type WatchableLinksStorage,
 } from "./storage/contract.ts";
 export {
+  pgListenNotify,
+  withWatch,
+  type PgNotificationClient,
+  type WatchSubscribe,
+} from "./storage/watch.ts";
+export {
   HOSTNAME_REGEX,
   KEY_REGEX,
   ValidationError,
