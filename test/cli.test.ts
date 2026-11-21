@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run } from "../src/cli.ts";
@@ -8,7 +8,7 @@ let dir: string;
 let out: string[];
 let err: string[];
 
-const ENV = ["STORAGE_DRIVER", "DEFAULT_DOMAIN", "TENANT", "AUTH_MODE", "PORT"];
+const ENV = ["STORAGE_DRIVER", "STORAGE_FILE_DIR", "DEFAULT_DOMAIN", "TENANT", "AUTH_MODE", "PORT"];
 const saved: Record<string, string | undefined> = {};
 
 // The `memory` driver is one store per process, so commands share state across
@@ -205,4 +205,19 @@ describe("serve auth", () => {
       expect(stdout()).not.toContain("listening");
     },
   );
+});
+
+describe("cli storage drivers (from @xtandard/kit/cli)", () => {
+  test("an unknown STORAGE_DRIVER is an error, not a silent file store (fixed)", async () => {
+    process.env.STORAGE_DRIVER = "postgress";
+    expect(await run(["domains", "list"])).toBe(1);
+    expect(err.join("")).toContain('Unknown STORAGE_DRIVER "postgress"');
+  });
+
+  test("an empty STORAGE_DRIVER means the default file store under STORAGE_FILE_DIR (fixed)", async () => {
+    process.env.STORAGE_DRIVER = "";
+    process.env.STORAGE_FILE_DIR = join(dir, "store");
+    expect(await run(["links", "create", "--url", "https://example.com", "--tenant", "f"])).toBe(0);
+    expect(existsSync(join(dir, "store", "lnk"))).toBe(true);
+  });
 });

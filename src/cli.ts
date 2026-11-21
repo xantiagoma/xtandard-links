@@ -11,18 +11,46 @@
  * @module
  */
 
-import type { AuthProvider } from "./auth/contract.ts";
-import type { AuthorizationProvider } from "./authorization/contract.ts";
+import {
+  buildAuthFromEnv,
+  describeStorage as kitDescribeStorage,
+  env,
+  isMainModule,
+  isTruthy,
+  parseArgs as kitParseArgs,
+  startServer,
+  storageFromEnv,
+  type StorageRegistry,
+  type StorageRole,
+} from "@xtandard/kit/cli";
+import { LINKS_ACTIONS, type LinksAction } from "./authorization/contract.ts";
 import { createLinksCore, publicLink, type ImportConflictPolicy, type LinksCore } from "./core.ts";
 import { DEFAULT_TENANT, type Link } from "./schema.ts";
 import type { LinksStorage } from "./storage/contract.ts";
 import { VERSION } from "./version.ts";
 
-type Driver = "memory" | "file" | "redis" | "postgres" | "mongodb" | "sqlite" | "libsql";
+/** The drivers the CLI accepts (an unknown `STORAGE_DRIVER` is an error). */
+const DRIVERS = ["memory", "file", "redis", "postgres", "mongodb", "sqlite", "libsql"] as const;
 
-const env = (key: string, fallback = ""): string => process.env[key] ?? fallback;
-
-const isTruthy = (value: string): boolean => value === "1" || value.toLowerCase() === "true";
+/**
+ * The storage role with the CLI's persisted defaults (ADR 0005), exactly as
+ * every earlier release used them: `STORAGE_DRIVER` (default `file`) plus the
+ * `STORAGE_*` overrides.
+ */
+const STORAGE: StorageRole = {
+  name: "STORAGE",
+  defaults: {
+    driver: "file",
+    prefix: "xtandard:links",
+    pgTable: "xtandard_links",
+    mongoDb: "xtandard_links",
+    mongoCollection: "links",
+    sqlitePath: "./.links/links.sqlite",
+    sqliteTable: "xtandard_links_kv",
+    libsqlUrl: "file:./.links/links.db",
+    fileDir: "./.links/storage",
+  },
+};
 
 const out = (text: string) => void process.stdout.write(text);
 const err = (text: string) => void process.stderr.write(text);
@@ -33,59 +61,46 @@ const err = (text: string) => void process.stderr.write(text);
  */
 let memoryStorage: LinksStorage | undefined;
 
+/** The links storage factories, so every CLI store carries the links defaults. */
+const STORAGE_DRIVERS: StorageRegistry<LinksStorage> = {
+  memory: async () => {
+    memoryStorage ??= (await import("./storage/memory.ts")).createMemoryStorage();
+    return memoryStorage;
+  },
+  file: async (c) => (await import("./storage/file.ts")).createFileStorage({ dir: c.fileDir! }),
+  redis: async (c) =>
+    (await import("./storage/redis.ts")).createRedisStorage({
+      url: c.redisUrl,
+      ...(c.prefix ? { prefix: c.prefix } : {}),
+    }),
+  postgres: async (c) =>
+    (await import("./storage/postgres.ts")).createPostgresStorage({
+      connectionString: c.postgresUrl,
+      ...(c.pgTable ? { table: c.pgTable } : {}),
+    }),
+  mongodb: async (c) =>
+    (await import("./storage/mongodb.ts")).createMongoStorage({
+      url: c.mongoUrl,
+      ...(c.mongoDb ? { dbName: c.mongoDb } : {}),
+      ...(c.mongoCollection ? { collectionName: c.mongoCollection } : {}),
+    }),
+  // Requires running the CLI under Bun (`bunx xtandard-links …`).
+  sqlite: async (c) =>
+    (await import("./storage/sqlite.ts")).createSqliteStorage({
+      ...(c.sqlitePath ? { path: c.sqlitePath } : {}),
+      ...(c.sqliteTable ? { table: c.sqliteTable } : {}),
+    }),
+  libsql: async (c) =>
+    (await import("./storage/libsql.ts")).createLibsqlStorage({
+      ...(c.libsqlUrl ? { url: c.libsqlUrl } : {}),
+      ...(c.libsqlAuthToken ? { authToken: c.libsqlAuthToken } : {}),
+      ...(c.sqliteTable ? { table: c.sqliteTable } : {}),
+    }),
+};
+
 /** Build the links storage from env. */
 async function buildStorage(): Promise<LinksStorage> {
-  const driver = (env("STORAGE_DRIVER", "file") as Driver) || "file";
-  switch (driver) {
-    case "redis": {
-      const { createRedisStorage } = await import("./storage/redis.ts");
-      return createRedisStorage({
-        url: env("REDIS_URL", "redis://localhost:6379"),
-        prefix: env("STORAGE_PREFIX", "xtandard:links"),
-      });
-    }
-    case "postgres": {
-      const { createPostgresStorage } = await import("./storage/postgres.ts");
-      return createPostgresStorage({
-        connectionString:
-          env("DATABASE_URL") || env("POSTGRES_URL", "postgres://localhost:5432/postgres"),
-        table: env("STORAGE_PG_TABLE", "xtandard_links"),
-      });
-    }
-    case "mongodb": {
-      const { createMongoStorage } = await import("./storage/mongodb.ts");
-      return createMongoStorage({
-        url: env("MONGO_URL", "mongodb://localhost:27017"),
-        dbName: env("MONGO_DB", "xtandard_links"),
-        collectionName: env("STORAGE_MONGO_COLLECTION", "links"),
-      });
-    }
-    case "sqlite": {
-      // Requires running the CLI under Bun (`bunx xtandard-links …`).
-      const { createSqliteStorage } = await import("./storage/sqlite.ts");
-      return createSqliteStorage({ path: env("STORAGE_SQLITE_PATH", "./.links/links.sqlite") });
-    }
-    case "libsql": {
-      const { createLibsqlStorage } = await import("./storage/libsql.ts");
-      const authToken = env("LIBSQL_AUTH_TOKEN");
-      return createLibsqlStorage({
-        url: env("STORAGE_LIBSQL_URL") || env("LIBSQL_URL", "file:./.links/links.db"),
-        ...(authToken ? { authToken } : {}),
-      });
-    }
-    case "memory": {
-      if (!memoryStorage) {
-        const { createMemoryStorage } = await import("./storage/memory.ts");
-        memoryStorage = createMemoryStorage();
-      }
-      return memoryStorage;
-    }
-    case "file":
-    default: {
-      const { createFileStorage } = await import("./storage/file.ts");
-      return createFileStorage({ dir: env("STORAGE_FILE_DIR", "./.links/storage") });
-    }
-  }
+  return storageFromEnv({ role: STORAGE, drivers: STORAGE_DRIVERS, allowed: DRIVERS });
 }
 
 /**
@@ -94,146 +109,32 @@ async function buildStorage(): Promise<LinksStorage> {
  * by name only (URLs may carry credentials).
  */
 async function describeStorage(): Promise<string> {
-  const { resolve } = await import("node:path");
-  const driver = (env("STORAGE_DRIVER", "file") as Driver) || "file";
-  switch (driver) {
-    case "file":
-      return `file → ${resolve(env("STORAGE_FILE_DIR", "./.links/storage"))}`;
-    case "sqlite":
-      return `sqlite → ${resolve(env("STORAGE_SQLITE_PATH", "./.links/links.sqlite"))}`;
-    case "memory":
-      return "memory (ephemeral — not persisted)";
-    default:
-      return driver;
-  }
+  return kitDescribeStorage(STORAGE, { allowed: DRIVERS });
 }
 
-/** `AUTH_MODE`, with an empty value meaning the default `none`. */
-const authModeFromEnv = (): string => process.env.AUTH_MODE || "none";
-
-/** Build the auth + authorization providers from env (mirrors the standalone app). */
-async function buildAuth(): Promise<{ auth: AuthProvider; authorization: AuthorizationProvider }> {
-  const mode = authModeFromEnv();
-  if (mode === "basic") {
-    const [{ basicAuth }, { rolesAuthorization }] = await Promise.all([
-      import("./auth/basic.ts"),
-      import("./authorization/roles.ts"),
-    ]);
-    const passwordHash = env("AUTH_PASSWORD_HASH");
-    const password = env("AUTH_PASSWORD");
-    if (!passwordHash && !password) {
-      err(
-        "[xtandard/links] AUTH_MODE=basic but neither AUTH_PASSWORD_HASH nor AUTH_PASSWORD is set.\n",
-      );
-    }
-    return {
-      auth: basicAuth({
-        realm: "xtandard-links",
-        users: [
-          {
-            username: env("AUTH_USERNAME", "admin"),
-            ...(passwordHash ? { passwordHash } : {}),
-            ...(password ? { password } : {}),
-            roles: ["admin"],
-          },
-        ],
-      }),
-      authorization: rolesAuthorization({}),
-    };
-  }
-  if (mode !== "none") throw new Error(`Unknown AUTH_MODE "${mode}" (expected none or basic)`);
-  const [{ noAuth }, { noAuthorization }] = await Promise.all([
-    import("./auth/none.ts"),
-    import("./authorization/none.ts"),
-  ]);
-  return { auth: noAuth(), authorization: noAuthorization() };
+/**
+ * The auth + authorization providers from env (mirrors the standalone app):
+ * `AUTH_MODE=none` (default) or `basic`; anything else is an error.
+ */
+async function buildAuth() {
+  const { DEFAULT_ROLE_POLICY } = await import("./authorization/roles.ts");
+  return buildAuthFromEnv<LinksAction>({
+    realm: "xtandard-links",
+    roles: { policy: DEFAULT_ROLE_POLICY, actions: LINKS_ACTIONS },
+    name: "xtandard/links",
+  });
 }
 
 type FetchHandler = (request: Request) => Response | Promise<Response>;
 
-/**
- * Serve a web-standard fetch handler under whatever runtime the CLI runs on:
- * `Bun.serve` under `bunx`, a `node:http` bridge under `npx`/Node.
- */
-async function startServer(port: number, fetch: FetchHandler): Promise<void> {
-  const bun = (globalThis as { Bun?: { serve: (options: unknown) => unknown } }).Bun;
-  if (bun) {
-    bun.serve({ port, fetch });
-    return;
-  }
-  const { createServer } = await import("node:http");
-  const server = createServer((req, res) => {
-    void (async () => {
-      try {
-        const chunks: Buffer[] = [];
-        for await (const c of req) chunks.push(c as Buffer);
-        const method = req.method ?? "GET";
-        const headers = new Headers();
-        for (const [k, v] of Object.entries(req.headers)) {
-          if (v === undefined) continue;
-          headers.set(k, Array.isArray(v) ? v.join(", ") : v);
-        }
-        const host = req.headers.host ?? `localhost:${port}`;
-        const url = `http://${host}${req.url ?? "/"}`;
-        const hasBody = method !== "GET" && method !== "HEAD" && chunks.length > 0;
-        const request = new Request(url, {
-          method,
-          headers,
-          body: hasBody ? Buffer.concat(chunks) : undefined,
-        });
-        const response = await fetch(request);
-        res.statusCode = response.status;
-        const cookies = response.headers.getSetCookie?.() ?? [];
-        response.headers.forEach((value, key) => {
-          if (key !== "set-cookie") res.setHeader(key, value);
-        });
-        if (cookies.length) res.setHeader("set-cookie", cookies);
-        res.end(Buffer.from(await response.arrayBuffer()));
-      } catch (e) {
-        res.statusCode = 500;
-        res.end(`Internal error: ${e instanceof Error ? e.message : String(e)}`);
-      }
-    })();
-  });
-  await new Promise<void>((resolve) => server.listen(port, resolve));
-}
-
 type Flags = Record<string, string | boolean>;
 
-/** Single-letter flags that take a value. */
-const SHORT: Record<string, string> = { o: "output", t: "tenant", p: "port", f: "format" };
-
-/** Minimal argv parser: `--key value`, `--key=value`, `--flag`, `-o value`. */
-function parseArgs(argv: string[]): { _: string[]; flags: Flags } {
-  const _: string[] = [];
-  const flags: Flags = {};
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i] as string;
-    if (a.startsWith("--")) {
-      const eq = a.indexOf("=");
-      if (eq > 0) {
-        flags[a.slice(2, eq)] = a.slice(eq + 1);
-        continue;
-      }
-      const key = a.slice(2);
-      const next = argv[i + 1];
-      if (next === undefined || next.startsWith("--")) flags[key] = true;
-      else {
-        flags[key] = next;
-        i++;
-      }
-    } else if (/^-[a-z]$/.test(a) && SHORT[a.slice(1)]) {
-      const next = argv[i + 1];
-      if (next !== undefined) {
-        flags[SHORT[a.slice(1)] as string] = next;
-        i++;
-      }
-    } else if (a === "-h" || a === "-v") {
-      flags[a === "-h" ? "help" : "version"] = true;
-    } else _.push(a);
-  }
-  return { _, flags };
-}
+/** argv: `--key value`, `--key=value`, `--flag`, `-o value`. */
+const parseArgs = (argv: string[]) =>
+  kitParseArgs(argv, {
+    short: { o: "output", t: "tenant", p: "port", f: "format", h: "help", v: "version" },
+    boolean: ["help", "version", "dry-run", "keep-domains", "json", "default", "force"],
+  });
 
 const str = (flags: Flags, key: string): string | undefined =>
   typeof flags[key] === "string" ? (flags[key] as string) : undefined;
@@ -733,7 +634,6 @@ async function serve(flags: Flags): Promise<number> {
   const title = env("TITLE", "@xtandard/links");
   const logoUrl = env("LOGO_URL");
   const readonly = isTruthy(env("READONLY"));
-  const authMode = authModeFromEnv();
   const viewerSecret = env("VIEWER_SECRET") || env("PORTAL_SECRET");
   const redirectBasePath = env("REDIRECT_BASE_PATH");
 
@@ -744,9 +644,9 @@ async function serve(flags: Flags): Promise<number> {
       import("@xtandard/kit/server"),
     ]);
   // Auth first: an unknown AUTH_MODE fails before storage connects or anything listens.
-  const { auth, authorization } = await buildAuth();
+  const { auth, authorization, mode } = await buildAuth();
   const storage = await buildStorage();
-  if (authMode === "none") {
+  if (mode === "none") {
     err("[xtandard/links] AUTH_MODE=none — do NOT expose this publicly without authentication.\n");
   }
   const basePath = normalizeBasePath(basePathRaw);
@@ -801,4 +701,10 @@ async function serve(flags: Flags): Promise<number> {
   out(`[xtandard/links] redirects on http://localhost:${port}/{slug}\n`);
   // The server owns the process now; never resolve so the bin doesn't exit.
   return await new Promise<number>(() => {});
+}
+
+// Run only when executed directly (`bun src/cli.ts`), not when imported by the
+// bin shim, the standalone app or a test.
+if (isMainModule({ url: import.meta.url })) {
+  void run(process.argv.slice(2)).then((code) => process.exit(code));
 }
