@@ -57,7 +57,9 @@ HTTP Basic with scrypt password hashes (`scrypt$<salt>$<hash>`, never plaintext 
 constant-time verification, and a `WWW-Authenticate` challenge so browsers prompt. A custom
 `passwordVerifier(username, password)` can delegate to your user store; a plain `password` field
 exists for development only. Pair with `AUTH_MODE=basic` + `AUTH_USERNAME` / `AUTH_PASSWORD_HASH` on
-the CLI and the standalone image.
+the CLI and the standalone image. `AUTH_MODE` accepts only `none` (the default, also when empty) or
+`basic`; any other value (e.g. a typo like `basci`) is rejected at startup rather than falling back
+to an open panel.
 
 Basic auth is also the simplest way to give a backend a **conversion-tracking key**: add a
 `{ username: "tracker", passwordHash, roles: ["tracker"] }` user and grant that role only
