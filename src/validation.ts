@@ -12,6 +12,7 @@ import {
   assertValid,
   issuesFrom as kitIssuesFrom,
   resultOf,
+  validateKeySegment as kitValidateKeySegment,
   validateUrl,
   ValidationError,
   type ValidationIssue,
@@ -38,13 +39,13 @@ const issuesFrom = (
 ): ValidationIssue[] =>
   parsed.success || !parsed.issues ? [] : kitIssuesFrom(parsed.issues, base);
 
-/** Validate a key segment (tenant key, external id): safe inside a storage key. */
+/**
+ * Validate a key segment (tenant key, external id): safe inside a storage key.
+ * The kit's check: a non-empty string of at most 256 {@link KEY_REGEX}
+ * characters, not only dots.
+ */
 export function validateKeySegment(value: unknown, path: string): ValidationIssue[] {
-  if (typeof value !== "string" || value.length === 0) return [{ path, message: "is required" }];
-  if (value.length > 256) return [{ path, message: "must be at most 256 characters" }];
-  if (!KEY_REGEX.test(value)) return [{ path, message: `must match ${KEY_REGEX}` }];
-  if (/^\.+$/.test(value)) return [{ path, message: `"${value}" is not an allowed key` }];
-  return [];
+  return kitValidateKeySegment(value, path, { maxLength: 256 });
 }
 
 /** Options for destination URL policy. */

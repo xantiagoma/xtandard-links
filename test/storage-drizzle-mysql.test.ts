@@ -62,7 +62,9 @@ describe.skipIf(!available)("drizzle mysql (live)", () => {
     },
     {
       t: { describe, test, expect },
-      capabilities: { compareAndSwap: true, watch: false },
+      // mysqlLinksTable keeps utf8mb4_bin (PAD SPACE): a key differing only by trailing spaces is
+      // refused with KeyCollisionError instead of coexisting.
+      capabilities: { compareAndSwap: true, watch: false, padSpaceKeys: true },
       timeout: 30_000,
     },
   );
