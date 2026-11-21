@@ -6,7 +6,9 @@
  * The root export: the core and its types (also on `/core` and `/schema`), the
  * redirect handler and resolver (also on `/redirect`), click enrichment (bots,
  * user agents, geo, privacy), the analytics sink contract and KV rollup sink,
- * rules, deep-link helpers, the hooks contract and the storage contract.
+ * rules, deep-link helpers, the hooks contract and the storage contract, the
+ * admin panel handler (`createFetchHandler`), analytics viewer tokens and the
+ * auth/authorization contracts.
  * Storage drivers, analytics adapters, auth providers, framework adapters and
  * the React embeds are separate subpaths with optional peer dependencies.
  *
@@ -109,3 +111,35 @@ export {
   type ValidationIssue,
   type ValidationResult,
 } from "./validation.ts";
+
+// Auth & authorization contracts (implement your own; providers live behind
+// the auth/* and authorization/* subpath exports)
+export type { AuthProvider, Principal } from "./auth/contract.ts";
+export type {
+  AuthorizationProvider,
+  AuthorizeInput,
+  LinksAction,
+  LinksResource,
+} from "./authorization/contract.ts";
+export { isMutatingAction, MUTATING_ACTIONS } from "./authorization/contract.ts";
+
+// Analytics viewer tokens (mint server-side, verify in the panel handler)
+export {
+  createViewerToken,
+  DEFAULT_VIEWER_ACTIONS,
+  DEFAULT_VIEWER_TOKEN_EXPIRES_IN,
+  VIEWER_GRANTABLE_ACTIONS,
+  VIEWER_TOKEN_PREFIX,
+  ViewerTokenError,
+  verifyViewerToken,
+  type ViewerTokenClaims,
+  type ViewerTokenOptions,
+} from "./portal.ts";
+
+// The admin panel handler (framework adapters wrap this)
+export { createFetchHandler } from "./server/create-fetch-handler.ts";
+export type { CreateFetchHandlerResult, LinksPanelOptions } from "./server/create-fetch-handler.ts";
+export type { LinksCorsOptions } from "./server/cors.ts";
+export type { LinksPortalOptions } from "./server/routes.ts";
+export { buildOpenApiDocument } from "./server/openapi.ts";
+export type { OpenApiOptions } from "./server/openapi.ts";
