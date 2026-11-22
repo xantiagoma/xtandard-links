@@ -18,6 +18,5 @@ jobs:
       bun-version: "1.4.4"
       db-name: links
       clickhouse-image: clickhouse/clickhouse-server:24.8
-      extra-env: '{"CLICKHOUSE_USER":"default"}'
       typecheck-examples: true
       e2e: true
