@@ -4,8 +4,8 @@ import { Download } from "lucide-react";
 import { getQrSvg } from "../api.ts";
 import type { PublicLink } from "../types.ts";
 import { errorMessage } from "../types.ts";
-import { cn } from "../lib/utils.ts";
-import { Button } from "./ui-bits.tsx";
+import { cn } from "@xtandard/kit/ui";
+import { Button } from "@xtandard/kit/ui";
 import { Spinner } from "./bits.tsx";
 
 const COLORS = [

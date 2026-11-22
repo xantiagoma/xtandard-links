@@ -6,9 +6,9 @@ import type { ImportResult } from "../types.ts";
 import { errorMessage } from "../types.ts";
 import { useShell } from "../lib/shell.tsx";
 import { displayUrl, formatCount } from "../lib/format.ts";
-import { cn } from "../lib/utils.ts";
-import { Button } from "../components/ui-bits.tsx";
-import { Dropdown, Segmented, TextArea, ToggleSwitch } from "../components/primitives.tsx";
+import { cn } from "@xtandard/kit/ui";
+import { Button } from "@xtandard/kit/ui";
+import { Dropdown, Segmented, TextArea, ToggleSwitch } from "@xtandard/kit/ui";
 import {
   EmptyCard,
   Field,
@@ -20,7 +20,7 @@ import {
   type Tone,
 } from "../components/bits.tsx";
 import { TagInput } from "../components/TagInput.tsx";
-import { useToast } from "../components/Toast.tsx";
+import { useToast } from "@xtandard/kit/ui";
 
 const FORMATS: { value: ImportFormat; label: string; description: string }[] = [
   { value: "auto", label: "Detect automatically", description: "From the header row" },

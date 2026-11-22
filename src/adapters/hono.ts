@@ -19,7 +19,8 @@
  */
 
 import { Hono, type MiddlewareHandler } from "hono";
-import type { RedirectContext, RedirectHandler } from "../redirect.ts";
+import { mountPanel, waitUntilOf } from "@xtandard/kit/adapters/hono";
+import type { RedirectHandler } from "../redirect.ts";
 import { createFetchHandler, type LinksPanelOptions } from "../server/create-fetch-handler.ts";
 import { toRedirectHandler, type LinksRedirectInput } from "./redirect-shared.ts";
 
@@ -30,28 +31,18 @@ import { toRedirectHandler, type LinksRedirectInput } from "./redirect-shared.ts
 export function linksPanel(options: LinksPanelOptions): Hono & {
   core: ReturnType<typeof createFetchHandler>["core"];
   openapi: ReturnType<typeof createFetchHandler>["openapi"];
+  close: ReturnType<typeof createFetchHandler>["close"];
 } {
   const handler = createFetchHandler(options);
-  const app = new Hono();
-  app.all("*", (c) => handler.fetch(c.req.raw));
-  return Object.assign(app, { core: handler.core, openapi: handler.openapi });
+  return Object.assign(mountPanel(new Hono(), handler.fetch), {
+    core: handler.core,
+    openapi: handler.openapi,
+    close: handler.close,
+  });
 }
 
 /** The redirect middleware, with the underlying handler attached. */
 export type HonoLinksRedirect = MiddlewareHandler & { handler: RedirectHandler };
-
-/** `c.executionCtx` throws outside Workers-style runtimes; read it defensively. */
-function waitUntilOf(c: { executionCtx: unknown }): RedirectContext | undefined {
-  try {
-    const ctx = c.executionCtx as { waitUntil?: (p: Promise<unknown>) => void } | undefined;
-    if (ctx && typeof ctx.waitUntil === "function") {
-      return { waitUntil: (p) => ctx.waitUntil?.(p) };
-    }
-  } catch {
-    // no ExecutionContext (Bun/Node)
-  }
-  return undefined;
-}
 
 /** Middleware answering short links and calling `next()` for everything else. */
 export function linksRedirect(options: LinksRedirectInput): HonoLinksRedirect {

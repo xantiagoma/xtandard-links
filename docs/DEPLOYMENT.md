@@ -101,27 +101,30 @@ real. For a single container with local persistence, mount a volume and use SQLi
 `-e STORAGE_DRIVER=sqlite -e STORAGE_SQLITE_PATH=/data/links.sqlite -v links-data:/data`. Build it
 yourself from the repository root with `docker build -f apps/standalone/Dockerfile -t xtandard-links .`.
 
-| Variable                                                 | Default                                                | Notes                                                                |
-| -------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------- |
-| `STORAGE_DRIVER`                                         | `file` (CLI) · `memory` (Docker)                       | `memory`, `file`, `redis`, `postgres`, `mongodb`, `sqlite`, `libsql` |
-| `STORAGE_FILE_DIR`                                       | `./.links/storage`                                     | `file`                                                               |
-| `STORAGE_SQLITE_PATH`                                    | `./.links/links.sqlite`                                | `sqlite` (Bun only; the image is Bun)                                |
-| `REDIS_URL`, `STORAGE_PREFIX`                            | `redis://localhost:6379`, `xtandard:links`             | `redis`                                                              |
-| `DATABASE_URL` / `POSTGRES_URL`, `STORAGE_PG_TABLE`      | `…/postgres`, `xtandard_links`                         | `postgres`                                                           |
-| `MONGO_URL`, `MONGO_DB`, `STORAGE_MONGO_COLLECTION`      | `mongodb://localhost:27017`, `xtandard_links`, `links` | `mongodb`                                                            |
-| `LIBSQL_URL` / `STORAGE_LIBSQL_URL`, `LIBSQL_AUTH_TOKEN` | `file:./.links/links.db`                               | `libsql`                                                             |
-| `DEFAULT_DOMAIN`                                         | `localhost`                                            | the shared default domain                                            |
-| `PORT`                                                   | `3000`                                                 |                                                                      |
-| `BASE_PATH`                                              | `/links`                                               | panel mount path; `/` redirects there                                |
-| `REDIRECT_BASE_PATH`                                     | —                                                      | also serve links under this prefix on any host (`/l`)                |
-| `AUTH_MODE`                                              | `none`                                                 | `none` or `basic` (one admin user)                                   |
-| `AUTH_USERNAME`, `AUTH_PASSWORD_HASH`                    | `admin`                                                | scrypt hash ([Auth](AUTH.md)); `AUTH_PASSWORD` for dev only          |
-| `VIEWER_SECRET`                                          | —                                                      | enables analytics viewer tokens (alias `PORTAL_SECRET`)              |
-| `VISITOR_SALT`                                           | random per process                                     | shared visitor-hash salt; set it when running several instances      |
-| `TITLE`, `LOGO_URL`                                      | `@xtandard/links`                                      | navbar wordmark / logo                                               |
-| `READONLY`                                               | —                                                      | `1` / `true` blocks every mutation                                   |
+| Variable                                                 | Default                                                | Notes                                                                                             |
+| -------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `STORAGE_DRIVER`                                         | `file` (CLI) · `memory` (Docker)                       | `memory`, `file`, `redis`, `postgres`, `mongodb`, `sqlite`, `libsql`; any other value is an error |
+| `STORAGE_FILE_DIR`                                       | `./.links/storage`                                     | `file`                                                                                            |
+| `STORAGE_SQLITE_PATH`                                    | `./.links/links.sqlite`                                | `sqlite` (Bun only; the image is Bun)                                                             |
+| `STORAGE_SQLITE_TABLE`                                   | `xtandard_links_kv`                                    | `sqlite`, `libsql`                                                                                |
+| `REDIS_URL`, `STORAGE_PREFIX`                            | `redis://localhost:6379`, `xtandard:links`             | `redis`                                                                                           |
+| `DATABASE_URL` / `POSTGRES_URL`, `STORAGE_PG_TABLE`      | `…/postgres`, `xtandard_links`                         | `postgres`                                                                                        |
+| `MONGO_URL`, `MONGO_DB`, `STORAGE_MONGO_COLLECTION`      | `mongodb://localhost:27017`, `xtandard_links`, `links` | `mongodb`                                                                                         |
+| `LIBSQL_URL` / `STORAGE_LIBSQL_URL`, `LIBSQL_AUTH_TOKEN` | `file:./.links/links.db`                               | `libsql`                                                                                          |
+| `DEFAULT_DOMAIN`                                         | `localhost`                                            | the shared default domain                                                                         |
+| `PORT`                                                   | `3000`                                                 |                                                                                                   |
+| `BASE_PATH`                                              | `/links`                                               | panel mount path; `/` redirects there                                                             |
+| `REDIRECT_BASE_PATH`                                     | —                                                      | also serve links under this prefix on any host (`/l`)                                             |
+| `AUTH_MODE`                                              | `none`                                                 | `none` or `basic` (one admin user); any other value is an error                                   |
+| `AUTH_USERNAME`, `AUTH_PASSWORD_HASH`                    | `admin`                                                | scrypt hash ([Auth](AUTH.md)); `AUTH_PASSWORD` for dev only                                       |
+| `AUTH_ROLE`                                              | `admin`                                                | the basic user's role                                                                             |
+| `VIEWER_SECRET`                                          | —                                                      | enables analytics viewer tokens (alias `PORTAL_SECRET`)                                           |
+| `VISITOR_SALT`                                           | random per process                                     | shared visitor-hash salt; set it when running several instances                                   |
+| `TITLE`, `LOGO_URL`                                      | `@xtandard/links`                                      | navbar wordmark / logo                                                                            |
+| `READONLY`                                               | —                                                      | `1` / `true` blocks every mutation                                                                |
 
-`GET /healthcheck` answers `{ status: "ok", title, version }` (the image's `HEALTHCHECK` uses it).
+An empty variable counts as unset (its default applies). `GET /healthcheck` answers
+`{ status: "ok", title, version }` (the image's `HEALTHCHECK` uses it).
 The standalone server uses the KV analytics sink in the same storage and edge-header geo, and
 takes its visitor-hash salt from `VISITOR_SALT` (random per process when unset: set it before
 running more than one container). For an OLAP sink or custom auth, embed the library instead. The CLI's other commands work against the same storage ([CLI](CLI.md)).

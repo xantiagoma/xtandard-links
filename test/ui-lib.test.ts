@@ -533,11 +533,12 @@ describe("permissions and errors", () => {
 
   it("renders API errors with field issues", () => {
     const err = new LinksApiError(400, {
+      status: 400,
       error: "Validation failed",
       errors: [{ path: "link.url", message: "must be absolute" }],
     });
     expect(errorMessage(err)).toBe("Validation failed — link.url: must be absolute");
-    expect(errorMessage(new LinksApiError(404, { error: "" }), "x")).toBe("x");
+    expect(errorMessage(new LinksApiError(404, { status: 404, error: "" }), "x")).toBe("x");
     expect(errorMessage(new Error("boom"))).toBe("boom");
     expect(errorMessage(42, "fallback")).toBe("fallback");
   });

@@ -26,6 +26,10 @@ Every command builds its storage from the environment (the same variables as the
 | `libsql`         | `LIBSQL_URL` or `STORAGE_LIBSQL_URL`, `LIBSQL_AUTH_TOKEN`                  |
 | `memory`         | nothing persists: only useful within `serve`                               |
 
+Any other `STORAGE_DRIVER` is an error (it used to fall back to `file`), and an empty variable
+counts as unset. `STORAGE_SQLITE_TABLE` names the `sqlite`/`libsql` table (default
+`xtandard_links_kv`).
+
 `DEFAULT_DOMAIN` is the shared domain for links that name none (registered on first use), and
 `TENANT` the default tenant (otherwise `default`). Every command takes `--tenant` / `-t <key>`.
 

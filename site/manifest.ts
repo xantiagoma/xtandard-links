@@ -1,123 +1,17 @@
-// The site's information architecture: which repository Markdown becomes which page, the sidebar
-// tree, and the package's entry points. scripts/sync.ts reads it to write src/content/docs/, and
-// astro.config.ts reads it to build the sidebar and the API reference, so a page and its sidebar
-// entry cannot drift.
+// The site's information architecture: which repository Markdown becomes which page, and the
+// sidebar tree (see `defineSiteManifest` in @xtandard/kit/site). scripts/sync.ts and
+// astro.config.ts both read it, so a page and its sidebar entry cannot drift.
 //
 // The Markdown in the repository (README.md, docs/*.md) stays the single source of truth: it is
-// what GitHub and npm render. A page is one of:
-//   - a whole repository file (`src`);
-//   - some H2 sections of one (`src` + `sections`, optionally `intro` for the text above the first
-//     H2) — how README.md is split into several pages. Every H2 of a split file other than the
-//     README must land on exactly one page, so a new section cannot silently disappear;
-//   - a page written for the site only (`site`, relative to site/content/).
-// Plain Node APIs only: Astro loads this file through Vite.
-import { existsSync, readFileSync } from "node:fs";
+// what GitHub and npm render. A page is a whole repository file (`src`), some H2 sections of one
+// (`src` + `sections`, optionally `intro`; every H2 of a split file other than the README must land
+// on exactly one page), or a page written for the site only (`site`, relative to site/content/).
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { defineSiteManifest, type SiteItem } from "@xtandard/kit/site";
 
-export const repoRoot = fileURLToPath(new URL("../", import.meta.url));
-export const repoSlug = "xantiagoma/xtandard-links";
-export const repoUrl = `https://github.com/${repoSlug}`;
-export const packageName = "@xtandard/links";
-export const npmUrl = "https://www.npmjs.com/package/@xtandard/links";
-export const branch = "main";
-/**
- * Where the site is served: the project site of xantiagoma.github.io, under the account's custom
- * domain. pages.yml passes what actions/configure-pages reports (SITE_ORIGIN, SITE_BASE), so a
- * domain change needs no code change.
- */
-const rawOrigin = process.env.SITE_ORIGIN || "https://me.xantiagoma.com";
-/** actions/configure-pages reports http://, which would leak into og:url, og:image and the sitemap. */
-export const siteOrigin = rawOrigin.replace(/^http:\/\//, "https://");
-export const siteBase = (process.env.SITE_BASE || "/xtandard-links").replace(/\/+$/, "");
-
-// ---- entry points ---------------------------------------------------------------------------
-
-export type Entry = {
-  /** The API reference module name (the `@module` tag of the entry file) and its route. */
-  module: string;
-  /** The import specifier users write. */
-  importPath: string;
-  /** The source file, relative to the repository root. */
-  source: string;
-};
-
-/** The root import's module name: `@xtandard/links` is documented at /api/links/. */
-export const rootModule = "links";
-
-/** Subpaths that are not TypeScript entry points (assets, the manifest). */
-const nonCode = (key: string) =>
-  key === "./package.json" || key.endsWith(".css") || key.includes("*");
-
-/**
- * Subpaths whose source a sibling branch is still building. When the file exists it is
- * documented like any other entry point; while it is missing it is skipped with a warning
- * instead of failing the build. Every other missing source fails loudly. Empty this list once
- * the work has landed.
- */
-const pendingEntries = new Set<string>();
-
-/**
- * Every public entry point, in package.json `exports` order. The source file follows the build's
- * convention (vite.config.ts `pack.entry`): the root is src/index.ts, a few subpaths have their
- * own module (src/core.ts, src/redirect.ts, src/react.tsx…), and the rest are
- * src/entry-<path-with-dashes>.ts.
- */
-export function entries(): Entry[] {
-  const exportsMap = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"))
-    .exports as Record<string, unknown>;
-  const out: Entry[] = [];
-  for (const key of Object.keys(exportsMap).filter((k) => !nonCode(k))) {
-    const sub = key.replace(/^\.\/?/, "");
-    const entryFile = `src/entry-${sub.replaceAll("/", "-")}.ts`;
-    const candidates =
-      sub === ""
-        ? ["src/index.ts"]
-        : sub.includes("/")
-          ? [entryFile]
-          : [`src/${sub}.ts`, `src/${sub}.tsx`, entryFile];
-    const source = candidates.find((f) => existsSync(join(repoRoot, f)));
-    if (!source) {
-      if (pendingEntries.has(key)) {
-        console.warn(`manifest.ts: skipping "${key}" (no source yet; listed in pendingEntries)`);
-        continue;
-      }
-      throw new Error(`manifest.ts: no source entry for "${key}" in package.json`);
-    }
-    out.push({
-      module: sub === "" ? rootModule : sub,
-      importPath: sub === "" ? packageName : `${packageName}/${sub}`,
-      source,
-    });
-  }
-  return out;
-}
-
-// ---- pages ----------------------------------------------------------------------------------
-
-export type Page = {
-  /** Route without the base and without slashes; "" is the home page. */
-  slug: string;
-  /** Sidebar label; the page title when absent. */
-  label?: string;
-  /** Repository file the page is built from. */
-  src?: string;
-  /** Only these H2 sections of `src` (by heading text, in file order). */
-  sections?: string[];
-  /** With `sections`: also the H1 and the text above the first H2. */
-  intro?: boolean;
-  /** Page title when it does not come from the source's H1. */
-  title?: string;
-  /** Site-only page in site/content/ (.md or .mdx). */
-  site?: string;
-  /** Contributor-only material: a banner says so and search skips it. */
-  internal?: boolean;
-};
-export type Link = { label: string; link: string };
-export type Group = { label: string; collapsed?: boolean; items: Item[] };
-export type Item = Page | Link | Group;
-
-export const home: Page = { slug: "", site: "index.mdx" };
+const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 
 const adrs: [file: string, label: string][] = [
   ["0001-single-package-subpath-exports.md", "0001 · Subpath exports"],
@@ -139,7 +33,7 @@ const adrs: [file: string, label: string][] = [
  * the first release has written CHANGELOG.md.
  */
 const hasChangelog = existsSync(join(repoRoot, "CHANGELOG.md"));
-const changelog: Item[] = hasChangelog
+const changelog: SiteItem[] = hasChangelog
   ? [
       {
         slug: "project/status",
@@ -152,7 +46,7 @@ const changelog: Item[] = hasChangelog
     ]
   : [];
 
-export const sidebar: Item[] = [
+const sidebar: SiteItem[] = [
   {
     label: "Start here",
     items: [
@@ -272,23 +166,16 @@ export const sidebar: Item[] = [
       },
       { slug: "project/brand", src: "docs/BRAND.md", label: "Brand", internal: true },
       { slug: "project/releases", src: "docs/RELEASES.md", label: "Releases", internal: true },
-      { label: "npm", link: npmUrl },
+      { label: "npm", link: "https://www.npmjs.com/package/@xtandard/links" },
     ],
   },
 ];
 
-export const isPage = (i: Item): i is Page => "slug" in i;
-export const isGroup = (i: Item): i is Group => "items" in i;
-
-/** Every page, the home page first. */
-export function pages(): Page[] {
-  const out: Page[] = [home];
-  const walk = (items: Item[]) => {
-    for (const i of items) {
-      if (isPage(i)) out.push(i);
-      else if (isGroup(i)) walk(i.items);
-    }
-  };
-  walk(sidebar);
-  return out;
-}
+export const manifest = defineSiteManifest({
+  repoRoot,
+  repoSlug: "xantiagoma/xtandard-links",
+  packageName: "@xtandard/links",
+  rootModule: "links",
+  base: "/xtandard-links",
+  sidebar,
+});

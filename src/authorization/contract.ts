@@ -9,7 +9,11 @@
  * @module
  */
 
-import type { Principal } from "../auth/contract.ts";
+import {
+  defineActions,
+  type AuthorizationProvider as KitAuthorizationProvider,
+  type AuthorizeInput as KitAuthorizeInput,
+} from "@xtandard/kit/authorization";
 
 /** The full set of authorizable actions. */
 export type LinksAction =
@@ -48,31 +52,67 @@ export type LinksResource =
   | { type: "viewer-token"; tenant: string };
 
 /** Input passed to {@link AuthorizationProvider.authorize}. */
-export interface AuthorizeInput {
-  principal: Principal | null;
-  action: LinksAction;
-  resource: LinksResource;
-  request: Request;
-}
+export type AuthorizeInput = KitAuthorizeInput<LinksAction, LinksResource>;
 
 /** Decides whether an action is permitted. */
-export interface AuthorizationProvider {
-  authorize(input: AuthorizeInput): Promise<boolean>;
-}
+export type AuthorizationProvider = KitAuthorizationProvider<LinksAction, LinksResource>;
+
+/**
+ * The action constants (`ALL_ACTIONS`, `MUTATING_ACTIONS`, `isMutatingAction`,
+ * and `PORTAL_ACTIONS`: the actions a viewer token can ever grant).
+ */
+export const LINKS_ACTIONS = defineActions<LinksAction>({
+  all: [
+    "tenant:read",
+    "tenant:update",
+    "tenant:delete",
+    "domain:read",
+    "domain:create",
+    "domain:update",
+    "domain:delete",
+    "link:read",
+    "link:create",
+    "link:update",
+    "link:delete",
+    "link:import",
+    "analytics:read",
+    "customer:read",
+    "audit:read",
+    "conversion:track",
+    "viewer-token:create",
+  ],
+  mutating: [
+    "tenant:update",
+    "tenant:delete",
+    "domain:create",
+    "domain:update",
+    "domain:delete",
+    "link:create",
+    "link:update",
+    "link:delete",
+    "link:import",
+    "conversion:track",
+  ],
+  // Confined to the token's tenant (and link set): tenant/domain management, the
+  // global audit log and minting further tokens are never grantable.
+  portal: [
+    "tenant:read",
+    "domain:read",
+    "link:read",
+    "link:create",
+    "link:update",
+    "link:delete",
+    "link:import",
+    "analytics:read",
+    "customer:read",
+    "audit:read",
+    "conversion:track",
+  ],
+});
 
 /** Actions that mutate state — blocked in readonly mode. */
-export const MUTATING_ACTIONS: ReadonlySet<LinksAction> = new Set<LinksAction>([
-  "tenant:update",
-  "tenant:delete",
-  "domain:create",
-  "domain:update",
-  "domain:delete",
-  "link:create",
-  "link:update",
-  "link:delete",
-  "link:import",
-  "conversion:track",
-]);
+export const MUTATING_ACTIONS: ReadonlySet<LinksAction> = LINKS_ACTIONS.MUTATING_ACTIONS;
 
 /** True if the action mutates state. */
-export const isMutatingAction = (action: LinksAction): boolean => MUTATING_ACTIONS.has(action);
+export const isMutatingAction = (action: LinksAction): boolean =>
+  LINKS_ACTIONS.isMutatingAction(action);

@@ -1,7 +1,7 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, test } from "vitest";
 import { clearFileStorage, createFileStorage } from "../src/storage/file.ts";
 import { runStorageContractTests } from "./storage-contract.ts";
 
@@ -18,7 +18,8 @@ afterAll(async () => {
 });
 
 runStorageContractTests("file", () => createFileStorage({ dir: freshDir() }), {
-  watch: { settleMs: 200 },
+  t: { describe, test, expect },
+  capabilities: { compareAndSwap: true, watch: { settleMs: 200 } },
 });
 
 describe("file storage extras", () => {
@@ -33,6 +34,14 @@ describe("file storage extras", () => {
     await storage.setItem("lnk/t/acme/a", { v: 1 });
     await clearFileStorage({ dir });
     expect(await storage.getKeys("lnk/")).toEqual([]);
+  });
+
+  it("stores keys that differ only by case in different files", async () => {
+    const dir = freshDir();
+    const storage = createFileStorage({ dir });
+    await storage.setItem("lnk/t/Acme/a", { v: 1 });
+    await storage.setItem("lnk/t/acme/a", { v: 2 });
+    expect(readdirSync(join(dir, "lnk", "t")).sort()).toEqual(["^acme", "acme"]);
   });
 
   it("persists across instances pointed at the same dir", async () => {

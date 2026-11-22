@@ -18,6 +18,12 @@
  */
 
 import type { Actor, Customer, Domain, LeadEvent, Link, SaleEvent, Tenant } from "../schema.ts";
+import {
+  createHookErrorReporter,
+  type HookErrorReporter as KitHookErrorReporter,
+  type Hooks,
+  type HooksInput,
+} from "@xtandard/kit/hooks";
 
 /** Event delivered to {@link LinksHooks.before} — the *proposed* mutation. */
 export type BeforeEvent =
@@ -49,74 +55,21 @@ export type BeforeEventType = BeforeEvent["type"];
 export type AfterEventType = AfterEvent["type"];
 
 /**
- * Thrown from a {@link LinksHooks.before} handler to **deny** a mutation with
- * a clean HTTP status (default `403`; e.g. `402`/`429` for plan limits).
- *
- * @example
- * ```ts
- * before(event) {
- *   if (event.type === "link.create" && overPlan(event.link.tenant)) {
- *     throw new HookDeniedError("Link limit reached for your plan.", { status: 402 });
- *   }
- * }
- * ```
+ * Throw from a `before` hook to deny a mutation with a specific HTTP status
+ * (default `403`); any other thrown error also denies. The API layer maps it
+ * by name, so it works across bundles.
  */
-export class HookDeniedError extends Error {
-  /** HTTP status the API layer should respond with. Default `403`. */
-  readonly status: number;
-  constructor(message: string, options?: { status?: number; cause?: unknown }) {
-    super(message, options?.cause !== undefined ? { cause: options.cause } : undefined);
-    this.name = "HookDeniedError";
-    this.status = options?.status ?? 403;
-  }
-}
+export { HookDeniedError, normalizeHooks, runAfter, runBefore } from "@xtandard/kit/hooks";
 
 /** A control-plane hook. Implement `before`, `after`, or both. */
-export interface LinksHooks {
-  /** Runs before a mutation commits. **Throw to deny.** */
-  before?(event: BeforeEvent): void | Promise<void>;
-  /** Runs after a mutation commits. Errors are reported, never rethrown. */
-  after?(event: AfterEvent): void | Promise<void>;
-}
+export type LinksHooks = Hooks<BeforeEvent, AfterEvent>;
 
 /** Accepts a single hook, an array, or nothing. */
-export type LinksHooksInput = LinksHooks | readonly LinksHooks[] | undefined;
+export type LinksHooksInput = HooksInput<BeforeEvent, AfterEvent>;
 
 /** Reports an error thrown by an `after` hook. */
-export type HookErrorReporter = (error: unknown, event: AfterEvent) => void;
+export type HookErrorReporter = KitHookErrorReporter<AfterEvent>;
 
-/** Normalize the `hooks` option into a flat array (empty when unset). */
-export function normalizeHooks(input: LinksHooksInput): LinksHooks[] {
-  if (!input) return [];
-  return Array.isArray(input) ? [...input] : [input as LinksHooks];
-}
-
-/** Run every `before` hook sequentially; the first throw aborts. */
-export async function runBefore(hooks: LinksHooks[], event: BeforeEvent): Promise<void> {
-  for (const hook of hooks) {
-    if (hook.before) await hook.before(event);
-  }
-}
-
-/** Run every `after` hook, isolating failures. */
-export async function runAfter(
-  hooks: LinksHooks[],
-  event: AfterEvent,
-  onError: HookErrorReporter,
-): Promise<void> {
-  await Promise.all(
-    hooks.map(async (hook) => {
-      if (!hook.after) return;
-      try {
-        await hook.after(event);
-      } catch (error) {
-        onError(error, event);
-      }
-    }),
-  );
-}
-
-/** Default `after`-hook error reporter: warn, but never throw. */
-export const defaultHookErrorReporter: HookErrorReporter = (error, event) => {
-  console.warn(`[@xtandard/links] after-hook for "${event.type}" threw:`, error);
-};
+/** Default `after`-hook error reporter: warn with the `[@xtandard/links]` prefix, never throw. */
+export const defaultHookErrorReporter: HookErrorReporter =
+  createHookErrorReporter("@xtandard/links");

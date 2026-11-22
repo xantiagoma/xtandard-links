@@ -6,9 +6,9 @@ import type { Domain } from "../types.ts";
 import { errorMessage, LinksApiError } from "../types.ts";
 import { useShell } from "../lib/shell.tsx";
 import { displayUrl, formatDate } from "../lib/format.ts";
-import { cn } from "../lib/utils.ts";
-import { Button } from "../components/ui-bits.tsx";
-import { Segmented, TextInput, ToggleSwitch } from "../components/primitives.tsx";
+import { cn } from "@xtandard/kit/ui";
+import { Button } from "@xtandard/kit/ui";
+import { Segmented, TextInput, ToggleSwitch } from "@xtandard/kit/ui";
 import {
   ConfirmDialog,
   EmptyCard,
@@ -21,7 +21,7 @@ import {
   StatusBadge,
 } from "../components/bits.tsx";
 import { TagInput } from "../components/TagInput.tsx";
-import { useToast } from "../components/Toast.tsx";
+import { useToast } from "@xtandard/kit/ui";
 
 interface AndroidDraft {
   packageName: string;

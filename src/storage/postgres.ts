@@ -7,80 +7,37 @@
  * alike. You can pass a pre-built `client`, or a `connectionString`/`url` to
  * lazily create a `pg` `Pool` on first use.
  *
- * The table is created on demand (`CREATE TABLE IF NOT EXISTS`) the first time
- * any operation runs, guarded by a single promise so concurrent callers only
- * issue the DDL once. Values are stored as `jsonb`; both `pg` and `pglite`
- * return `jsonb` already parsed to JS, but a string is JSON-parsed defensively
- * so either driver works.
+ * The driver is `@xtandard/kit/storage/postgres`. The table is created on
+ * demand (`CREATE TABLE IF NOT EXISTS`) the first time any operation runs; a
+ * failed DDL is retried on the next call. The table name defaults to
+ * `"xtandard_links_kv"`, as in every earlier release.
  *
  * Implements {@link CompareAndSwapLinksStorage}: claiming an absent key is an
  * `INSERT … ON CONFLICT DO NOTHING`, and a swap is a single conditional
  * `UPDATE … WHERE value = $expected::jsonb` — both atomic in one statement, so
- * concurrent slug claims across processes have exactly one winner. `jsonb`
- * equality is structural (object key order is irrelevant), matching the
- * contract's deep-equality semantics.
+ * concurrent slug claims across processes have exactly one winner.
  *
  * @module
  */
 
-import { requirePeer } from "./contract.ts";
-import type { CompareAndSwapLinksStorage } from "./contract.ts";
+import * as kit from "@xtandard/kit/storage/postgres";
 
-/**
- * Minimal structural view of a SQL client. Both `pg`'s `Pool`/`Client` and
- * `@electric-sql/pglite`'s `PGlite` satisfy this shape.
- */
-export interface SqlClient {
-  query(text: string, params?: unknown[]): Promise<{ rows: Array<Record<string, unknown>> }>;
-}
+export type { SqlClient } from "@xtandard/kit/storage/postgres";
 
-/** A client this adapter can also shut down (e.g. a `pg` `Pool`). */
-interface ClosableSqlClient extends SqlClient {
-  end?(): Promise<unknown>;
-}
-
-/** Options for {@link createPostgresStorage}. */
-export interface PostgresStorageOptions {
-  /**
-   * A pre-built client exposing `query(text, params?) => Promise<{ rows }>`.
-   * Both a `pg` `Pool`/`Client` and `@electric-sql/pglite` satisfy this.
-   */
-  client?: SqlClient;
-  /**
-   * Connection string used to lazily create a `pg` `Pool` (via dynamic import)
-   * when no `client` is supplied.
-   */
-  connectionString?: string;
-  /** Alias for {@link PostgresStorageOptions.connectionString}. */
-  url?: string;
-  /** Table name (default `"xtandard_links_kv"`). Must be a safe SQL identifier. */
-  table?: string;
-}
+/** Options for {@link createPostgresStorage}. `table` defaults to `"xtandard_links_kv"`. */
+export type PostgresStorageOptions = kit.PostgresStorageOptions;
 
 /**
  * A {@link CompareAndSwapLinksStorage} backed by Postgres, plus a `close()` method that
  * ends the underlying pool — but only the one this adapter created. A client
  * you passed in is left for you to manage.
  */
-export interface PostgresLinksStorage extends CompareAndSwapLinksStorage {
-  /** End the underlying pool if this adapter created it. No-op otherwise. */
-  close(): Promise<void>;
-}
-
-/** Identifiers we are willing to interpolate into DDL/queries unquoted. */
-const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-
-/**
- * Escape LIKE wildcards (`%`, `_`) and the escape char itself in a literal
- * prefix so `getKeys` matches the prefix verbatim. Paired with `ESCAPE '\'`.
- */
-const escapeLike = (literal: string): string => literal.replace(/[\\%_]/g, (c) => `\\${c}`);
+export type PostgresLinksStorage = kit.PostgresKvStorage;
 
 /**
  * Create a Postgres-backed {@link PostgresLinksStorage}. The table is created
  * lazily on first use; connection (when using `connectionString`/`url`) is also
- * lazy — the `pg` `Pool` is imported and constructed on the first operation and
- * reused thereafter.
+ * lazy.
  *
  * @example
  * ```ts
@@ -96,121 +53,10 @@ const escapeLike = (literal: string): string => literal.replace(/[\\%_]/g, (c) =
  * // const storage = createPostgresStorage({ client: new PGlite() });
  * ```
  */
-export function createPostgresStorage(options: PostgresStorageOptions): PostgresLinksStorage {
-  const table = options.table ?? "xtandard_links_kv";
-  if (!SAFE_IDENTIFIER.test(table)) {
-    throw new Error(
-      `Invalid table name ${JSON.stringify(table)}: must match ${SAFE_IDENTIFIER.source}`,
-    );
-  }
-  const connectionString = options.connectionString ?? options.url;
-  const ownsClient = !options.client;
-
-  let client: ClosableSqlClient | undefined = options.client;
-  let connecting: Promise<ClosableSqlClient> | undefined;
-  let ensured: Promise<void> | undefined;
-
-  /** Resolve a client, creating a `pg` `Pool` on first use when needed. */
-  async function getClient(): Promise<ClosableSqlClient> {
-    if (client) return client;
-    connecting ??= (async () => {
-      let Pool: new (config: { connectionString?: string }) => ClosableSqlClient;
-      try {
-        ({ Pool } = (await import("pg")) as unknown as {
-          Pool: new (config: { connectionString?: string }) => ClosableSqlClient;
-        });
-      } catch {
-        requirePeer("pg", "storage/postgres");
-      }
-      client = new Pool({ connectionString });
-      return client;
-    })();
-    try {
-      return await connecting;
-    } finally {
-      connecting = undefined;
-    }
-  }
-
-  /** Create the backing table once, before the first operation. */
-  async function ensureTable(): Promise<ClosableSqlClient> {
-    const c = await getClient();
-    ensured ??= (async () => {
-      await c.query(
-        `CREATE TABLE IF NOT EXISTS ${table} (key text PRIMARY KEY, value jsonb NOT NULL)`,
-      );
-    })();
-    await ensured;
-    return c;
-  }
-
-  /**
-   * Normalise a `jsonb` column value. Both `pg` and `pglite` typically return
-   * it already parsed, but parse a string defensively so either driver works.
-   */
-  const parseValue = <T>(value: unknown): T => {
-    if (typeof value === "string") {
-      try {
-        return JSON.parse(value) as T;
-      } catch {
-        return value as T;
-      }
-    }
-    return value as T;
-  };
-
-  return {
-    async getItem<T>(key: string): Promise<T | null> {
-      const c = await ensureTable();
-      const { rows } = await c.query(`SELECT value FROM ${table} WHERE key = $1`, [key]);
-      const row = rows[0];
-      if (row === undefined || row.value === null || row.value === undefined) return null;
-      return parseValue<T>(row.value);
-    },
-
-    async setItem<T>(key: string, value: T): Promise<void> {
-      const c = await ensureTable();
-      await c.query(
-        `INSERT INTO ${table} (key, value) VALUES ($1, $2::jsonb)
-         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-        [key, JSON.stringify(value)],
-      );
-    },
-
-    async removeItem(key: string): Promise<void> {
-      const c = await ensureTable();
-      await c.query(`DELETE FROM ${table} WHERE key = $1`, [key]);
-    },
-
-    async getKeys(prefix: string): Promise<string[]> {
-      const c = await ensureTable();
-      const { rows } = await c.query(`SELECT key FROM ${table} WHERE key LIKE $1 ESCAPE '\\'`, [
-        `${escapeLike(prefix)}%`,
-      ]);
-      // Defensive: a case-/accent-insensitive column collation would widen LIKE matches.
-      return rows.map((row) => String(row.key)).filter((key) => key.startsWith(prefix));
-    },
-
-    async compareAndSwap<T>(input: { key: string; expected: T | null; next: T }): Promise<boolean> {
-      const c = await ensureTable();
-      const next = JSON.stringify(input.next);
-      if (input.expected === null) {
-        const { rows } = await c.query(
-          `INSERT INTO ${table} (key, value) VALUES ($1, $2::jsonb)
-           ON CONFLICT (key) DO NOTHING RETURNING key`,
-          [input.key, next],
-        );
-        return rows.length === 1;
-      }
-      const { rows } = await c.query(
-        `UPDATE ${table} SET value = $2::jsonb WHERE key = $1 AND value = $3::jsonb RETURNING key`,
-        [input.key, next, JSON.stringify(input.expected)],
-      );
-      return rows.length === 1;
-    },
-
-    async close(): Promise<void> {
-      if (ownsClient && client?.end) await client.end();
-    },
-  } satisfies PostgresLinksStorage;
+export function createPostgresStorage(options: PostgresStorageOptions = {}): PostgresLinksStorage {
+  return kit.createPostgresStorage({
+    subpath: "@xtandard/links/storage/postgres",
+    ...options,
+    table: options.table ?? "xtandard_links_kv",
+  });
 }

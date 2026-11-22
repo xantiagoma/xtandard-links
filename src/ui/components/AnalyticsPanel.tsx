@@ -60,10 +60,10 @@ import {
   formatPercent,
   percentChange,
 } from "../lib/format.ts";
-import { cn } from "../lib/utils.ts";
+import { cn } from "@xtandard/kit/ui";
 import { useShell } from "../lib/shell.tsx";
 import { BarList, Sparkline, TimeseriesChart, type BarRow } from "./Charts.tsx";
-import { Segmented } from "./primitives.tsx";
+import { Segmented } from "@xtandard/kit/ui";
 
 /* ─── URL-backed state ──────────────────────────────────────────────────────── */
 

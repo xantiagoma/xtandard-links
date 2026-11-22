@@ -99,15 +99,15 @@ VIEWER_TOKEN`) and re-render with the new `token`.
 
 ### Without React
 
-The bundled SPA accepts the token in the query string and renders the same widget chrome, so an
-iframe works anywhere:
+The bundled SPA accepts the token in the URL fragment (or the query string) and renders the same
+widget chrome, so an iframe works anywhere:
 
 ```html
-<iframe src="/links/?token=lvt_…" style="width: 100%; height: 640px; border: 0"></iframe>
+<iframe src="/links/#token=lvt_…" style="width: 100%; height: 640px; border: 0"></iframe>
 ```
 
-The token is then visible in the iframe URL (and your server's access logs): keep `expiresIn`
-short.
+The SPA removes the token from the address bar once it has read it. Prefer the fragment: it never
+reaches your server or its access logs, where `?token=` does. Keep `expiresIn` short either way.
 
 ### Cross-origin
 

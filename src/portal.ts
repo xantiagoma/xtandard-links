@@ -17,15 +17,18 @@
  * ```
  *
  * Zero dependencies (Web Crypto only). The secret is an arbitrary string, fed
- * to the HMAC as raw UTF-8 bytes. Revoking tokens before they expire means
- * rotating the secret.
+ * to the HMAC as raw UTF-8 bytes. The mechanics are `@xtandard/kit/tokens`;
+ * the `lvt_` prefix, the 1-day default lifetime and the `{ tenant, links?,
+ * allow? }` claims are the links contract. An empty secret is rejected, and
+ * `verifyViewerToken` accepts a list of secrets for rotation (the first signs,
+ * any verifies). Revoking tokens before they expire means rotating the secret
+ * without keeping the old one.
  *
  * @module
  */
 
-import type { LinksAction } from "./authorization/contract.ts";
-import { durationToMs } from "./duration.ts";
-import { base64url, fromBase64url, hmacSha256, timingSafeEqual } from "./password.ts";
+import { LINKS_ACTIONS, type LinksAction } from "./authorization/contract.ts";
+import { createScopedTokens, type TokenSecret } from "@xtandard/kit/tokens";
 import type { LinksDuration } from "./schema.ts";
 
 /** Prefix of every viewer token. */
@@ -42,31 +45,39 @@ export const DEFAULT_VIEWER_ACTIONS: readonly LinksAction[] = ["analytics:read",
  * token's tenant (and link set); tenant/domain management, the global audit log
  * and minting further tokens are never grantable.
  */
-export const VIEWER_GRANTABLE_ACTIONS: readonly LinksAction[] = [
-  "tenant:read",
-  "domain:read",
-  "link:read",
-  "link:create",
-  "link:update",
-  "link:delete",
-  "link:import",
-  "analytics:read",
-  "customer:read",
-  "audit:read",
-  "conversion:track",
-];
+export const VIEWER_GRANTABLE_ACTIONS: readonly LinksAction[] = LINKS_ACTIONS.PORTAL_ACTIONS;
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((v) => typeof v === "string");
+
+/** The viewer token mechanics: `lvt_` prefix, 1-day default lifetime, links claims. */
+const viewerTokens = createScopedTokens<Omit<ViewerTokenClaims, "exp">>({
+  prefix: VIEWER_TOKEN_PREFIX,
+  ttl: DEFAULT_VIEWER_TOKEN_EXPIRES_IN,
+  label: "viewer token",
+  errorName: "ViewerTokenError",
+  validateClaims: (raw) => {
+    if (typeof raw.tenant !== "string" || raw.tenant.length === 0) {
+      throw new Error("missing tenant");
+    }
+    if (raw.links !== undefined && !isStringArray(raw.links)) throw new Error("malformed links");
+    if (raw.allow !== undefined && !isStringArray(raw.allow)) throw new Error("malformed allow");
+    return {
+      tenant: raw.tenant,
+      ...(raw.links ? { links: raw.links } : {}),
+      ...(raw.allow ? { allow: raw.allow as LinksAction[] } : {}),
+    };
+  },
+});
 
 /**
  * Thrown by {@link verifyViewerToken} for any invalid token — malformed, bad
  * signature, or expired — and by {@link createViewerToken} for invalid input.
  * Maps to HTTP 401 at the API layer.
  */
-export class ViewerTokenError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ViewerTokenError";
-  }
-}
+export const ViewerTokenError = viewerTokens.TokenError;
+/** An invalid viewer token (see the {@link ViewerTokenError} class). */
+export type ViewerTokenError = InstanceType<typeof ViewerTokenError>;
 
 /** Options for {@link createViewerToken}. */
 export interface ViewerTokenOptions {
@@ -92,9 +103,6 @@ export interface ViewerTokenClaims {
   exp: number;
 }
 
-const isStringArray = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((v) => typeof v === "string");
-
 /**
  * Mint a viewer token. Call this **server-side** — anyone holding the secret
  * can mint tokens for any tenant.
@@ -112,23 +120,21 @@ const isStringArray = (value: unknown): value is string[] =>
  * ```
  */
 export async function createViewerToken(
-  secret: string,
+  secret: TokenSecret,
   options: ViewerTokenOptions,
 ): Promise<string> {
-  if (!secret) throw new ViewerTokenError("A viewer token secret is required");
+  if (secret.length === 0) throw new ViewerTokenError("A viewer token secret is required");
   if (typeof options.tenant !== "string" || options.tenant.length === 0) {
     throw new ViewerTokenError("A viewer token needs a tenant");
   }
-  const expiresInMs = durationToMs(options.expiresIn ?? DEFAULT_VIEWER_TOKEN_EXPIRES_IN);
-  const claims: ViewerTokenClaims = {
+  const claims = {
     tenant: options.tenant,
     ...(options.links ? { links: [...options.links] } : {}),
     ...(options.allow ? { allow: [...options.allow] } : {}),
-    exp: Date.now() + expiresInMs,
   };
-  const payloadPart = base64url(new TextEncoder().encode(JSON.stringify(claims)));
-  const signature = base64url(await hmacSha256(secret, payloadPart));
-  return `${VIEWER_TOKEN_PREFIX}${payloadPart}.${signature}`;
+  return viewerTokens.create(secret, claims, {
+    expiresIn: options.expiresIn ?? DEFAULT_VIEWER_TOKEN_EXPIRES_IN,
+  });
 }
 
 /**
@@ -142,56 +148,10 @@ export async function createViewerToken(
  * const { tenant, links } = await verifyViewerToken(secret, token);
  * ```
  */
-export async function verifyViewerToken(secret: string, token: string): Promise<ViewerTokenClaims> {
-  if (!token.startsWith(VIEWER_TOKEN_PREFIX)) {
-    throw new ViewerTokenError("Invalid viewer token: missing lvt_ prefix");
-  }
-  const parts = token.slice(VIEWER_TOKEN_PREFIX.length).split(".");
-  if (parts.length !== 2 || !parts[0] || !parts[1]) {
-    throw new ViewerTokenError("Invalid viewer token: malformed");
-  }
-  const [payloadPart, signaturePart] = parts as [string, string];
-
-  // Signature first: never interpret unauthenticated claims.
-  let candidate: Uint8Array;
-  try {
-    candidate = fromBase64url(signaturePart);
-  } catch {
-    throw new ViewerTokenError("Invalid viewer token: malformed signature");
-  }
-  const expected = await hmacSha256(secret, payloadPart);
-  if (!timingSafeEqual(expected, candidate)) {
-    throw new ViewerTokenError("Invalid viewer token: signature mismatch");
-  }
-
-  let raw: Record<string, unknown>;
-  try {
-    raw = JSON.parse(new TextDecoder().decode(fromBase64url(payloadPart))) as Record<
-      string,
-      unknown
-    >;
-  } catch {
-    throw new ViewerTokenError("Invalid viewer token: malformed payload");
-  }
-  if (typeof raw.tenant !== "string" || raw.tenant.length === 0) {
-    throw new ViewerTokenError("Invalid viewer token: missing tenant");
-  }
-  if (typeof raw.exp !== "number" || !Number.isFinite(raw.exp)) {
-    throw new ViewerTokenError("Invalid viewer token: missing expiry");
-  }
-  if (raw.links !== undefined && !isStringArray(raw.links)) {
-    throw new ViewerTokenError("Invalid viewer token: malformed links");
-  }
-  if (raw.allow !== undefined && !isStringArray(raw.allow)) {
-    throw new ViewerTokenError("Invalid viewer token: malformed allow");
-  }
-  if (Date.now() >= raw.exp) {
-    throw new ViewerTokenError("Viewer token has expired");
-  }
-  return {
-    tenant: raw.tenant,
-    ...(raw.links ? { links: raw.links } : {}),
-    ...(raw.allow ? { allow: raw.allow as LinksAction[] } : {}),
-    exp: raw.exp,
-  };
+export async function verifyViewerToken(
+  secret: TokenSecret,
+  token: string,
+): Promise<ViewerTokenClaims> {
+  const { claims, expiresAt } = await viewerTokens.verify(secret, token);
+  return { ...claims, exp: expiresAt };
 }

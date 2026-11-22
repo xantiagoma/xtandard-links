@@ -33,18 +33,21 @@ Values are JSON-serializable. Optional capabilities, each its own interface with
 | Driver         | Import                                  | Factory                                        | Peer                       | Compare-and-swap | Watch                              |
 | -------------- | --------------------------------------- | ---------------------------------------------- | -------------------------- | ---------------- | ---------------------------------- |
 | Memory         | `@xtandard/links/storage/memory`        | `createMemoryStorage`                          | —                          | ✓                | ✓                                  |
-| File (JSON)    | `@xtandard/links/storage/file`          | `createFileStorage`                            | — (`node:fs`)              | —                | ✓ (`fs.watch`)                     |
+| File (JSON)    | `@xtandard/links/storage/file`          | `createFileStorage`                            | — (`node:fs`)              | ✓ (in-process)   | ✓ (`fs.watch`)                     |
 | Redis          | `@xtandard/links/storage/redis`         | `createRedisStorage`, `createRedisJSONStorage` | `redis` (node-redis 4/5)   | ✓ (Lua)          | ✓ (keyspace notifications)         |
 | Postgres       | `@xtandard/links/storage/postgres`      | `createPostgresStorage`                        | `pg` (or pglite)           | ✓                | via `withWatch` + `pgListenNotify` |
-| Drizzle        | `@xtandard/links/storage/drizzle`       | `createDrizzleStorage`                         | `drizzle-orm`              | ✓ (pg, sqlite)   | via `withWatch`                    |
+| Drizzle        | `@xtandard/links/storage/drizzle`       | `createDrizzleStorage`                         | `drizzle-orm`              | ✓                | via `withWatch`                    |
 | MongoDB        | `@xtandard/links/storage/mongodb`       | `createMongoStorage`                           | `mongodb`                  | ✓                | via `withWatch`                    |
 | SQLite         | `@xtandard/links/storage/sqlite`        | `createSqliteStorage`                          | — (`bun:sqlite`, Bun only) | ✓                | —                                  |
 | libSQL / Turso | `@xtandard/links/storage/libsql`        | `createLibsqlStorage`                          | `@libsql/client`           | ✓                | —                                  |
 | unstorage      | `@xtandard/links/storage/unstorage`     | `createUnstorageStorage`                       | `unstorage`                | —                | via `withWatch`                    |
 | Cloudflare KV  | `@xtandard/links/storage/cloudflare-kv` | `createCloudflareKvStorage`                    | — (the binding)            | —                | —                                  |
 
-Every driver passes the same conformance suite (`test/storage-contract.ts`). Missing optional peers
-fail at import time with an actionable message (`requirePeer`). Drivers that open their own
+The drivers are `@xtandard/kit/storage/*` with the links defaults (tables, Mongo names, the pg
+channel). Every driver passes the kit's conformance suite plus the links key-layout cases
+(`test/storage-contract.ts`). Writes are canonical JSON (key order), and compare-and-swap also
+matches a value an earlier release stored in another key order. Missing optional peers fail on
+first use with an actionable message that names the `@xtandard/links/storage/*` import. Drivers that open their own
 connection expose `close()`; a client you pass in is borrowed and never closed.
 
 ### Options
@@ -90,8 +93,9 @@ createCloudflareKvStorage({ namespace: env.LINKS, prefix: "prod" });
 
 ### Choosing
 
-- **One process, local disk**: SQLite (Bun) or File. File is human-readable and watchable, but has
-  no compare-and-swap: fine for one writer.
+- **One process, local disk**: SQLite (Bun) or File. File is human-readable and watchable; its
+  compare-and-swap and writes (temporary file + rename) are safe within one process only: fine for
+  one writer.
 - **Several app instances**: Postgres, Redis, MongoDB, libSQL, or Drizzle over Postgres/SQLite.
   Compare-and-swap makes slug claims race-free across every process; Redis also evicts caches
   instantly through keyspace notifications.
@@ -100,7 +104,7 @@ createCloudflareKvStorage({ namespace: env.LINKS, prefix: "prod" });
 
 ### Without compare-and-swap
 
-File, unstorage and Cloudflare KV have no conditional write. Slug claims fall back to
+unstorage and Cloudflare KV have no conditional write (File's only holds within one process). Slug claims fall back to
 read-then-write with a re-read check, the same stance as the siblings' plain-KV mode: safe with a
 single writer, but two processes claiming the same slug at the same instant can both appear to win
 (the later write owns the pointer; the other link's slug does not resolve). Cloudflare KV is also
@@ -165,18 +169,26 @@ import { createDrizzleStorage } from "@xtandard/links/storage/drizzle";
 const storage = createDrizzleStorage({ db: drizzle(pool), table: linksKv });
 ```
 
-| Helper                                              | Columns                                                                                         | Options                                     |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `pgLinksTable(name?, opts?)` (`drizzle/pg`)         | `key text PRIMARY KEY`, `value jsonb NOT NULL`                                                  | `schema`, `extraColumns`, `extraIndexes`    |
-| `mysqlLinksTable(name?, opts?)` (`drizzle/mysql`)   | `key varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin PRIMARY KEY`, `value json NOT NULL` | `keyLength`, `extraColumns`, `extraIndexes` |
-| `sqliteLinksTable(name?, opts?)` (`drizzle/sqlite`) | `key text PRIMARY KEY`, `value text NOT NULL` (JSON mode)                                       | `extraColumns`, `extraIndexes`              |
+| Helper                                              | Columns                                                                                         | Options                                                     |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `pgLinksTable(name?, opts?)` (`drizzle/pg`)         | `key text PRIMARY KEY`, `value jsonb NOT NULL`                                                  | `schema`, `keyCollation`, `extraColumns`, `extraIndexes`    |
+| `mysqlLinksTable(name?, opts?)` (`drizzle/mysql`)   | `key varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin PRIMARY KEY`, `value json NOT NULL` | `keyLength`, `keyCollation`, `extraColumns`, `extraIndexes` |
+| `sqliteLinksTable(name?, opts?)` (`drizzle/sqlite`) | `key text PRIMARY KEY`, `value text NOT NULL` (JSON mode)                                       | `extraColumns`, `extraIndexes`                              |
 
 **MySQL: keep the binary collation.** MySQL's default collation (`utf8mb4_0900_ai_ci`) is case- and
 accent-insensitive, which would merge keys such as `lnk/t/Acme/…` and `lnk/t/acme/…` (two tenants,
 or two slugs on a case-sensitive domain). The helper declares `utf8mb4_bin`; if you write the table
 by hand or alter it, keep a binary collation on `key`. Mind InnoDB's index-prefix limit when raising
-`keyLength`. MySQL has no `RETURNING`, so a MySQL-table storage has no compare-and-swap (see
-[above](#without-compare-and-swap)); Postgres and SQLite tables do.
+`keyLength`. Every dialect has compare-and-swap, MySQL included.
+
+**MySQL: trailing spaces.** `utf8mb4_bin` is a PAD SPACE collation: `"a "` and `"a"` are the same
+primary key. The driver compares keys byte-exactly and throws `KeyCollisionError` rather than let
+one overwrite the other. links keys never end in a space (every variable segment is URI-encoded, so
+a space is stored as `%20`), so this only matters for keys you write yourself. New tables can opt
+into a NO PAD collation with `keyCollation` (`"utf8mb4_0900_bin"` on MySQL 8.0+,
+`"utf8mb4_nopad_bin"` on MariaDB); the default stays `utf8mb4_bin`, so existing schemas see no
+`drizzle-kit` diff. `pgLinksTable` keeps a plain `text` key for the same reason; `keyCollation: "C"`
+opts new tables into bytewise, index-usable prefixes.
 
 ## Key layout
 
@@ -220,12 +232,14 @@ the conformance suite against it:
 
 ```ts
 // my-storage.test.ts, inside this repository's test setup
+import { describe, expect, test } from "vitest";
 import { runStorageContractTests } from "./storage-contract.ts";
 import { createMyStorage } from "../src/my-storage.ts";
 
 runStorageContractTests("my storage", () => createMyStorage({ … }), {
-  compareAndSwap: true, // run the CAS battery (your driver implements compareAndSwap)
-  watch: { settleMs: 50 }, // run the watch battery, waiting 50 ms for notifications
+  t: { describe, test, expect }, // vitest or bun:test
+  // Declare every capability; `false` for what the driver lacks.
+  capabilities: { compareAndSwap: true, watch: { settleMs: 50 } },
 });
 ```
 

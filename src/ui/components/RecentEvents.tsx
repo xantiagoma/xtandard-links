@@ -12,9 +12,9 @@ import {
   prettyValue,
   relativeTime,
 } from "../lib/format.ts";
-import { Button } from "./ui-bits.tsx";
+import { Button } from "@xtandard/kit/ui";
 import { StatusBadge } from "./bits.tsx";
-import { Segmented } from "./primitives.tsx";
+import { Segmented } from "@xtandard/kit/ui";
 
 type Kind = "all" | AnalyticsEvent["type"];
 

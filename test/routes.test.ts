@@ -576,3 +576,55 @@ describe("cors", () => {
     expect(res.headers.get("access-control-allow-origin")).toBeNull();
   });
 });
+
+describe("panel (from @xtandard/kit/server)", () => {
+  test("a wrong method on an API route is 405 with Allow", async () => {
+    const { call } = setup();
+    const { status, res } = await call("PUT", "/api/tenants/default/links");
+    expect(status).toBe(405);
+    expect(res.headers.get("allow")).toBe("GET, POST");
+  });
+
+  test("a non-GET on a non-API path is 405 with Allow", async () => {
+    const { call } = setup();
+    const { status, res } = await call("POST", "/somewhere");
+    expect(status).toBe(405);
+    expect(res.headers.get("allow")).toBe("GET, HEAD");
+  });
+
+  test("a malformed % escape is a 404, not a 500", async () => {
+    const { call } = setup();
+    expect((await call("GET", "/api/tenants/%E0%A4%A/links")).status).toBe(404);
+  });
+
+  test("the SPA gets window.__LINKS_CONFIG__ with the version, an escaped title and no-cache", async () => {
+    const { call } = setup({ title: "<script>x</script>", readonly: true });
+    const { data, res } = await call("GET", "/links-view");
+    expect(res.headers.get("cache-control")).toBe("no-cache");
+    expect(data).toContain("window.__LINKS_CONFIG__=");
+    expect(data).toContain('"readonly":true');
+    expect(data).toContain('"version":');
+    expect(data).not.toContain("<script>x</script>");
+  });
+
+  test("/healthcheck keeps the links body ({ status, version })", async () => {
+    const { call } = setup();
+    expect((await call("GET", "/healthcheck")).data).toEqual({
+      status: "ok",
+      version: expect.any(String),
+    });
+  });
+
+  test("a Bearer lvt_ token is recognised whatever the scheme's case", async () => {
+    const { call } = setup({ portal: { secret: "s" } });
+    const res = await call("GET", "/api/tenants", undefined, { authorization: "bearer lvt_x.y" });
+    expect(res.status).toBe(401);
+    expect(res.data.code).toBe("VIEWER_TOKEN");
+  });
+
+  test("close() is safe to call repeatedly", async () => {
+    const { panel } = setup();
+    await panel.close();
+    await panel.close();
+  });
+});

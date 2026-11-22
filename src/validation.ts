@@ -8,8 +8,20 @@
  * @module
  */
 
+import {
+  assertValid,
+  issuesFrom as kitIssuesFrom,
+  resultOf,
+  validateKeySegment as kitValidateKeySegment,
+  validateUrl,
+  ValidationError,
+  type ValidationIssue,
+  type ValidationResult,
+} from "@xtandard/kit/util";
 import * as v from "valibot";
 import { DEFAULT_RESERVED_SLUGS, slugProblem } from "./slug.ts";
+
+export { assertValid, ValidationError, type ValidationIssue, type ValidationResult };
 
 /** Allowed characters for tenant keys and external ids. */
 export const KEY_REGEX = /^[a-zA-Z0-9._-]+$/;
@@ -18,67 +30,23 @@ export const KEY_REGEX = /^[a-zA-Z0-9._-]+$/;
 export const HOSTNAME_REGEX =
   /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
-/** One validation problem. */
-export interface ValidationIssue {
-  path: string;
-  message: string;
-}
+const result = resultOf;
 
-/** Result of a `validate*` function. */
-export interface ValidationResult {
-  valid: boolean;
-  errors: ValidationIssue[];
-}
-
-/** Thrown for invalid input. Maps to HTTP 400. */
-export class ValidationError extends Error {
-  readonly errors: ValidationIssue[];
-  constructor(errors: ValidationIssue[]) {
-    super(`Validation failed:\n${errors.map((e) => `  - ${e.path}: ${e.message}`).join("\n")}`);
-    this.name = "ValidationError";
-    this.errors = errors;
-  }
-}
-
-/** Throw a {@link ValidationError} when `result` is invalid. */
-export function assertValid(result: ValidationResult): void {
-  if (!result.valid) throw new ValidationError(result.errors);
-}
-
-const result = (errors: ValidationIssue[]): ValidationResult => ({
-  valid: errors.length === 0,
-  errors,
-});
-
-function issuesFrom(
-  parsed: { success: boolean; issues?: v.BaseIssue<unknown>[] },
+/** Valibot issues of a failed parse, under `base` (see the kit's `issuesFrom`). */
+const issuesFrom = (
+  parsed: { success: boolean; issues?: readonly v.BaseIssue<unknown>[] },
   base: string,
-): ValidationIssue[] {
-  if (parsed.success || !parsed.issues) return [];
-  return parsed.issues.map((issue) => {
-    const dotPath = v.getDotPath(issue);
-    return { path: dotPath ? `${base}.${dotPath}` : base, message: issue.message };
-  });
-}
+): ValidationIssue[] =>
+  parsed.success || !parsed.issues ? [] : kitIssuesFrom(parsed.issues, base);
 
-/** Validate a key segment (tenant key, external id): safe inside a storage key. */
+/**
+ * Validate a key segment (tenant key, external id): safe inside a storage key.
+ * The kit's check: a non-empty string of at most 256 {@link KEY_REGEX}
+ * characters, not only dots.
+ */
 export function validateKeySegment(value: unknown, path: string): ValidationIssue[] {
-  if (typeof value !== "string" || value.length === 0) return [{ path, message: "is required" }];
-  if (value.length > 256) return [{ path, message: "must be at most 256 characters" }];
-  if (!KEY_REGEX.test(value)) return [{ path, message: `must match ${KEY_REGEX}` }];
-  if (/^\.+$/.test(value)) return [{ path, message: `"${value}" is not an allowed key` }];
-  return [];
+  return kitValidateKeySegment(value, path, { maxLength: 256 });
 }
-
-/** Schemes a destination may never use. */
-const FORBIDDEN_SCHEMES = new Set([
-  "javascript:",
-  "data:",
-  "vbscript:",
-  "file:",
-  "blob:",
-  "about:",
-]);
 
 /** Options for destination URL policy. */
 export interface UrlPolicyOptions {
@@ -88,31 +56,23 @@ export interface UrlPolicyOptions {
   urlPolicy?: (url: URL) => string | null | undefined;
 }
 
-/** Validate a destination URL. */
+/**
+ * Validate a destination URL: an absolute URL of at most 8192 characters, never
+ * `javascript:`, `data:`, `vbscript:`, `file:`, `blob:` or `about:` (the kit's
+ * `validateUrl`), then the links policy.
+ */
 export function validateDestinationUrl(
   value: unknown,
   path: string,
   options: UrlPolicyOptions = {},
 ): ValidationIssue[] {
-  if (typeof value !== "string" || value.length === 0) return [{ path, message: "is required" }];
-  if (value.length > 8192) return [{ path, message: "must be at most 8192 characters" }];
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return [{ path, message: "must be an absolute URL" }];
-  }
-  if (FORBIDDEN_SCHEMES.has(url.protocol)) {
-    return [{ path, message: `scheme ${url.protocol} is not allowed` }];
-  }
-  const web = url.protocol === "http:" || url.protocol === "https:";
-  if (!web && options.allowAppSchemes === false) {
-    return [{ path, message: "must be an http(s) URL" }];
-  }
-  if (web && !url.hostname) return [{ path, message: "must have a host" }];
-  const custom = options.urlPolicy?.(url);
-  if (custom) return [{ path, message: custom }];
-  return [];
+  return validateUrl(value, path, {
+    policy: (url) => {
+      const web = url.protocol === "http:" || url.protocol === "https:";
+      if (!web && options.allowAppSchemes === false) return "must be an http(s) URL";
+      return options.urlPolicy?.(url) || undefined;
+    },
+  });
 }
 
 const str = (max = 2048) => v.pipe(v.string(), v.maxLength(max));

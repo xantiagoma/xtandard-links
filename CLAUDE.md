@@ -14,6 +14,9 @@ attribution and deep links, with pluggable storage and an embeddable admin UI. B
 - Analytics go through the `AnalyticsSink` port (`src/analytics/`), never straight to storage.
 - Storage drivers must pass `test/storage-contract.ts`; analytics sinks must pass
   `test/analytics-contract.ts`.
+- The shared building blocks (storage drivers, auth, HTTP plumbing, adapters, CLI plumbing, the UI
+  shell, build and site tooling, CI) come from `@xtandard/kit`; the files here are thin wrappers that
+  pass the links defaults. Fix shared bugs in the kit, not in a wrapper.
 
 ## Docs Site
 
@@ -21,13 +24,14 @@ attribution and deep links, with pluggable storage and an embeddable admin UI. B
 `.github/workflows/pages.yml` to https://me.xantiagoma.com/xtandard-links/.
 
 - `README.md` and `docs/*.md` stay the source of truth (they render on GitHub/npm).
-  `site/scripts/sync.ts` copies them into `site/src/content/docs/` (generated, gitignored); README
-  sections become pages per `site/manifest.ts` — so **renaming an H2 in `README.md` that the
-  manifest lists, or adding/renaming a file in `docs/`, needs `site/manifest.ts` updated** (sync
-  fails loudly otherwise). Relative links between docs are rewritten to site routes.
+  `site/scripts/sync.ts` (`runSync` from `@xtandard/kit/site`) copies them into
+  `site/src/content/docs/` (generated, gitignored); README sections become pages per
+  `site/manifest.ts` — so **renaming an H2 in `README.md` that the manifest lists, or
+  adding/renaming a file in `docs/`, needs `site/manifest.ts` updated** (sync fails loudly
+  otherwise). Relative links between docs are rewritten to site routes.
 - Site-only pages (the home page) live in `site/content/`.
 - The API reference is generated from `src/` by starlight-typedoc, one module per `exports` entry
-  in `package.json` (`entries()` in `site/manifest.ts`). Each entry file starts with a
-  `@module <name>` doc comment that names and describes its page.
+  in `package.json` (`manifest.apiEntries()`, from `@xtandard/kit/site`). Each entry file starts
+  with a `@module <name>` doc comment that names and describes its page.
 - `bun run docs:dev` / `docs:build` / `docs:preview`. Astro runs under Bun (`bun --bun astro …`);
   `.mdx` is excluded from `vp fmt` (it mangles MDX). The build fails on any broken internal link.

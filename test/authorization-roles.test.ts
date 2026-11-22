@@ -2,8 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { Principal } from "../src/auth/contract.ts";
 import type { AuthorizeInput, LinksAction, LinksResource } from "../src/authorization/contract.ts";
 import { isMutatingAction, MUTATING_ACTIONS } from "../src/authorization/contract.ts";
-import { delegatedAuthorization } from "../src/authorization/delegated.ts";
-import { noAuthorization } from "../src/authorization/none.ts";
+import { VIEWER_GRANTABLE_ACTIONS } from "../src/portal.ts";
 import {
   ALL_ACTIONS,
   DEFAULT_ROLE_POLICY,
@@ -115,29 +114,18 @@ describe("MUTATING_ACTIONS", () => {
   });
 });
 
-describe("noAuthorization", () => {
-  test("allows everything, even for a null principal", async () => {
-    const authz = noAuthorization();
-    expect(await authz.authorize(input(null, "tenant:delete"))).toBe(true);
-  });
-});
-
-describe("delegatedAuthorization", () => {
-  test("allows when the delegate returns true", async () => {
-    const authz = delegatedAuthorization({ authorize: () => true });
-    expect(await authz.authorize(input(null, "link:update"))).toBe(true);
-  });
-
-  test("denies when the delegate returns false", async () => {
-    const authz = delegatedAuthorization({ authorize: () => false });
-    expect(await authz.authorize(input(admin, "link:read"))).toBe(false);
-  });
-
-  test("normalizes an async delegate and receives the input", async () => {
-    const authz = delegatedAuthorization({
-      authorize: async ({ action }) => action === "link:read",
-    });
-    expect(await authz.authorize(input(admin, "link:read"))).toBe(true);
-    expect(await authz.authorize(input(admin, "link:update"))).toBe(false);
+describe("VIEWER_GRANTABLE_ACTIONS", () => {
+  test("never grants tenant/domain management, minting tokens", () => {
+    for (const action of [
+      "tenant:update",
+      "tenant:delete",
+      "domain:create",
+      "domain:update",
+      "domain:delete",
+      "viewer-token:create",
+    ] as const) {
+      expect(VIEWER_GRANTABLE_ACTIONS).not.toContain(action);
+    }
+    for (const action of VIEWER_GRANTABLE_ACTIONS) expect(ALL_ACTIONS).toContain(action);
   });
 });

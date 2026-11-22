@@ -1,53 +1,12 @@
-@import "tailwindcss";
-
 /*
- * shadcn-style token system shared with @xtandard/flags and @xtandard/webhooks: a
- * largely neutral palette with a single accent used sparingly — here the brand
- * lime (docs/BRAND.md). On light surfaces the accent is a deep lime that passes
- * WCAG AA for text; on dark it is the bright artwork lime. Light is the default; dark is
- * applied via `data-theme="dark"` on <html> (see theme.ts). `@theme inline` maps
- * the semantic vars to Tailwind color utilities (bg-card, text-muted-foreground…).
+ * The admin shell's stylesheet. Tailwind, the `@theme` mapping, the dark
+ * variant, the chart/code tokens and the base layer are `@xtandard/kit/ui`'s;
+ * it replaces `@import "tailwindcss"` (never import Tailwind twice). Below are
+ * the links brand tokens (docs/BRAND.md): a largely neutral palette with the
+ * brand lime as the single accent — on light surfaces a deep lime that passes
+ * WCAG AA for text, on dark the bright artwork lime.
  */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
-
-@theme inline {
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono:
-    "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, "Cascadia Code", Consolas, monospace;
-
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-info: var(--info);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-}
+@import "@xtandard/kit/ui/styles.css";
 
 /* ── Light (default) ─────────────────────────────────────────────────────── */
 :root {
@@ -130,61 +89,4 @@
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
   --shadow-md: 0 2px 4px oklch(0 0 0 / 0.3), 0 10px 28px oklch(0 0 0 / 0.45);
   --shadow-lg: 0 18px 48px oklch(0 0 0 / 0.55);
-}
-
-@layer base {
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-    border-color: var(--border);
-  }
-  html,
-  body,
-  #root {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-  }
-  body {
-    background-color: var(--background);
-    color: var(--foreground);
-    font-family: var(--font-sans);
-    font-size: 14px;
-    line-height: 1.5;
-    letter-spacing: -0.006em;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-  :focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
-  }
-}
-
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-thumb {
-  background: color-mix(in oklab, var(--muted-foreground) 35%, transparent);
-  border-radius: 4px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
 }

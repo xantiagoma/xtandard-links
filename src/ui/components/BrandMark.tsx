@@ -1,8 +1,7 @@
-/// <reference path="../assets.d.ts" />
 import * as React from "react";
 import symbolSvg from "../public/symbol.svg?raw";
 import symbolLightSvg from "../public/symbol-light.svg?raw";
-import { cn } from "../lib/utils.ts";
+import { cn } from "@xtandard/kit/ui";
 
 // The navbar symbol (docs/BRAND.md) is inlined as a data URL so the SPA and the
 // React embed render it without serving any asset: symbol-light.svg (the light

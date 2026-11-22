@@ -71,10 +71,13 @@ read the click id from the redirect's `location` (`xl_id`), then call `core.trac
 
 ### The two conformance suites
 
-`runStorageContractTests(name, makeStorage, { compareAndSwap?, watch? })` runs against memory,
+`runStorageContractTests(name, makeStorage, { t, capabilities, seedLegacy? })` runs the
+`@xtandard/kit/storage/testing` conformance suite (key root `lnk`) plus the links key-layout cases
+against memory,
 file, Postgres (pglite always, a real server with `POSTGRES_URL`), Drizzle over pglite, Drizzle
-over MySQL (live), Redis and RedisJSON (live), MongoDB (live), SQLite and libSQL (Bun), unstorage,
-and a fake Cloudflare KV binding.
+over MySQL (live), Redis and RedisJSON (the kit's fake client always, a live server with
+`REDIS_URL` / `REDIS_JSON_URL`), MongoDB (live), SQLite and libSQL (Bun), unstorage, and a fake
+Cloudflare KV binding.
 
 `runAnalyticsContractTests(name, makeSink, options)` pins the analytics semantics (time ranges,
 bucket alignment, zero-filled timeseries, breakdown ordering, `(none)` values, bot exclusion,
@@ -92,7 +95,7 @@ Tests that need a server skip unless its variable is set:
 | Variable                                                                             | Enables                                          |
 | ------------------------------------------------------------------------------------ | ------------------------------------------------ |
 | `REDIS_URL`                                                                          | Redis storage (live conformance, keyspace watch) |
-| `REDIS_STACK_URL`                                                                    | RedisJSON storage (needs the JSON module)        |
+| `REDIS_JSON_URL`                                                                     | RedisJSON storage (needs the JSON module)        |
 | `POSTGRES_URL`                                                                       | Postgres storage against a real server           |
 | `MONGO_URL`                                                                          | MongoDB storage                                  |
 | `MYSQL_URL`                                                                          | Drizzle over MySQL                               |

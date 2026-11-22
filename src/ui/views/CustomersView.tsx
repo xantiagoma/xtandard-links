@@ -8,8 +8,8 @@ import { useShell } from "../lib/shell.tsx";
 import { rangeFor } from "../lib/analytics.ts";
 import { conversionRate } from "../lib/analytics.ts";
 import { formatCount, formatDateTime, formatMoney, initials, relativeTime } from "../lib/format.ts";
-import { TextInput } from "../components/primitives.tsx";
-import { Avatar } from "../components/ui-bits.tsx";
+import { TextInput } from "@xtandard/kit/ui";
+import { Avatar } from "@xtandard/kit/ui";
 import { EmptyCard, LoadingRow, Mono, NoTenant, Page, PageHeader } from "../components/bits.tsx";
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {

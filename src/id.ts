@@ -3,34 +3,27 @@
  * (ULID layout). Ids sort lexicographically by creation time — click ids
  * double as an ordering key for raw event logs. Zero dependencies (Web Crypto).
  *
+ * The generator is `@xtandard/kit/util`'s `createIdGenerator` in the `ulid`
+ * format (ids are stored data, so the format never changes): integer
+ * milliseconds, monotonic within a process.
+ *
  * @module
  */
+
+import { createIdGenerator } from "@xtandard/kit/util";
 
 /** Prefixes for generated ids. */
 export type IdPrefix = "lnk" | "clk" | "lead" | "sale" | "rule";
 
-const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-
-function encodeTime(millis: number): string {
-  let out = "";
-  let t = Math.floor(millis);
-  for (let i = 0; i < 10; i++) {
-    out = ALPHABET[t % 32] + out;
-    t = Math.floor(t / 32);
-  }
-  return out;
-}
-
-function randomPart(length: number): string {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  let out = "";
-  for (const b of bytes) out += ALPHABET[b % 32];
-  return out;
-}
+const ids = createIdGenerator<IdPrefix>({
+  format: "ulid",
+  prefixes: ["lnk", "clk", "lead", "sale", "rule"],
+});
 
 /**
- * Generate a new time-sortable id, e.g. `newId("lnk")` → `"lnk_01JD…"`.
+ * Generate a new time-sortable id, e.g. `newId("lnk")` → `"lnk_01JD…"`. Ids
+ * minted in the same (or an earlier) millisecond increment the previous random
+ * part, so creation order and sort order always agree.
  *
  * @example
  * ```ts
@@ -40,48 +33,15 @@ function randomPart(length: number): string {
  * ```
  */
 export function newId(prefix: IdPrefix, now: number = Date.now()): string {
-  // Monotonic within a process: ids minted in the same (or an earlier) millisecond increment
-  // the previous random part, so creation order and sort order always agree.
-  if (now <= lastTime && lastRandom) {
-    lastRandom = increment(lastRandom);
-    return `${prefix}_${encodeTime(lastTime)}${lastRandom}`;
-  }
-  lastTime = now;
-  lastRandom = randomPart(16);
-  return `${prefix}_${encodeTime(now)}${lastRandom}`;
-}
-
-let lastTime = -1;
-let lastRandom = "";
-
-/** Base32 increment of the random part (carry overflow re-randomizes, which is astronomically rare). */
-function increment(value: string): string {
-  const chars = value.split("");
-  for (let i = chars.length - 1; i >= 0; i--) {
-    const v = ALPHABET.indexOf(chars[i] as string);
-    if (v < 31) {
-      chars[i] = ALPHABET[v + 1] as string;
-      return chars.join("");
-    }
-    chars[i] = "0";
-  }
-  return randomPart(value.length);
+  return ids.newId(prefix, now);
 }
 
 /** Regex an id of the given prefix must match. */
 export function idPattern(prefix: IdPrefix): RegExp {
-  return new RegExp(`^${prefix}_[0-9A-HJKMNP-TV-Z]{26}$`);
+  return ids.idPattern(prefix);
 }
 
 /** The creation time (epoch millis) encoded in an id, or `NaN` if malformed. */
 export function idTime(id: string): number {
-  const body = id.slice(id.indexOf("_") + 1, id.indexOf("_") + 11);
-  if (body.length !== 10) return Number.NaN;
-  let t = 0;
-  for (const ch of body) {
-    const v = ALPHABET.indexOf(ch);
-    if (v < 0) return Number.NaN;
-    t = t * 32 + v;
-  }
-  return t;
+  return ids.idTime(id) ?? Number.NaN;
 }

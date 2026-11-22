@@ -1,39 +1,18 @@
-import React from "react";
-import { createRoot } from "react-dom/client";
-import { useBrowserLocation } from "wouter/use-browser-location";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+// The standalone SPA: theme applied before first paint, an analytics viewer
+// token taken from `#token=…` / `?token=…` (and stripped from the address bar)
+// and sent as a Bearer credential, so `/config` reports `viewer: true` and the
+// shell renders the reduced widget chrome (ADR 0009); browser history routing
+// under the injected base path.
+import { bootSpa } from "@xtandard/kit/ui";
 import { App } from "./App.tsx";
-import { setApiToken } from "./api.ts";
-import { ToastProvider } from "./components/Toast.tsx";
-import { initTheme } from "./theme.ts";
+import * as api from "./api.ts";
+import { themeStore } from "./theme.ts";
 import "./styles.css";
 
-// Apply the persisted theme before first paint.
-initTheme();
-
-// Standalone widget affordance: `?token=lvt_…` attaches an analytics viewer
-// token as a Bearer credential on every API request; `/config` then reports
-// `viewer: true` and the shell renders the reduced widget chrome (ADR 0009).
-const token = new URLSearchParams(window.location.search).get("token");
-if (token) setApiToken(token);
-
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+bootSpa({
+  App,
+  configGlobal: "__LINKS_CONFIG__",
+  themeKey: themeStore,
+  tokenFromUrl: true,
+  api,
 });
-
-const root = document.getElementById("root");
-if (!root) throw new Error("Root element not found");
-
-// The panel handler serves the SPA as a catch-all under its basePath, so use
-// real browser-history routing for clean, deep-linkable paths.
-const basePath = (window.__LINKS_CONFIG__?.basePath ?? "").replace(/\/$/, "");
-
-createRoot(root).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <App locationHook={useBrowserLocation} base={basePath} />
-      </ToastProvider>
-    </QueryClientProvider>
-  </React.StrictMode>,
-);

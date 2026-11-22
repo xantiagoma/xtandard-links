@@ -7,7 +7,7 @@ import { useShell } from "../lib/shell.tsx";
 import { describeCondition, ruleTarget, variantPercents } from "../lib/rules.ts";
 import { applyUtm, UTM_KEYS } from "../lib/link-form.ts";
 import { displayUrl, formatCount, formatDateTime, relativeTime, shortUrl } from "../lib/format.ts";
-import { Button } from "../components/ui-bits.tsx";
+import { Button } from "@xtandard/kit/ui";
 import { CopyButton, EmptyCard, LoadingRow, NoTenant, Page, TagPill } from "../components/bits.tsx";
 import { AnalyticsPanel } from "../components/AnalyticsPanel.tsx";
 import { RecentEvents } from "../components/RecentEvents.tsx";

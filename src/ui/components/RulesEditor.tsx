@@ -25,9 +25,9 @@ import {
 } from "../lib/rules.ts";
 import { fromLocalInput, toLocalInput } from "../lib/link-form.ts";
 import { countryName, continentName, displayUrl, prettyValue } from "../lib/format.ts";
-import { cn } from "../lib/utils.ts";
-import { Button } from "./ui-bits.tsx";
-import { Dropdown, Segmented, TextInput } from "./primitives.tsx";
+import { cn } from "@xtandard/kit/ui";
+import { Button } from "@xtandard/kit/ui";
+import { Dropdown, Segmented, TextInput } from "@xtandard/kit/ui";
 import { TagInput } from "./TagInput.tsx";
 
 const VARIANT_COLORS = [
