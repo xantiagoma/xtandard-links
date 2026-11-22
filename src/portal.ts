@@ -56,8 +56,6 @@ const viewerTokens = createScopedTokens<Omit<ViewerTokenClaims, "exp">>({
   ttl: DEFAULT_VIEWER_TOKEN_EXPIRES_IN,
   label: "viewer token",
   errorName: "ViewerTokenError",
-  // Read the clock at call time, so a mocked `Date` (fake timers) is honoured.
-  now: () => Date.now(),
   validateClaims: (raw) => {
     if (typeof raw.tenant !== "string" || raw.tenant.length === 0) {
       throw new Error("missing tenant");
