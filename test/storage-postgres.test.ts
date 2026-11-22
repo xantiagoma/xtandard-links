@@ -1,6 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
 import { afterAll, describe, expect, test, vi } from "vitest";
-import { createPostgresStorage, type PostgresLinksStorage } from "../src/storage/postgres.ts";
+import { createPostgresStorage } from "../src/storage/postgres.ts";
 import { runStorageContractTests } from "./storage-contract.ts";
 
 // Every test boots a fresh in-process PGlite (WASM Postgres), which can take
@@ -63,15 +63,14 @@ describe("createPostgresStorage (links defaults)", () => {
 describe.skipIf(!process.env.POSTGRES_URL)("createPostgresStorage (live)", () => {
   const runId = Date.now();
   let counter = 0;
-  const opened: Array<{ storage: PostgresLinksStorage; table: string }> = [];
+  const tables: string[] = [];
 
   runStorageContractTests(
     "postgres (live)",
     () => {
       const table = `xtandard_links_contract_${runId}_${counter++}`;
-      const storage = createPostgresStorage({ connectionString: process.env.POSTGRES_URL, table });
-      opened.push({ storage, table });
-      return storage;
+      tables.push(table);
+      return createPostgresStorage({ connectionString: process.env.POSTGRES_URL, table });
     },
     {
       t: { describe, test, expect },
@@ -80,13 +79,11 @@ describe.skipIf(!process.env.POSTGRES_URL)("createPostgresStorage (live)", () =>
     },
   );
 
+  // The kit suite closes each storage after its case; only the tables are left to drop.
   afterAll(async () => {
     const { Pool } = await import("pg");
     const pool = new Pool({ connectionString: process.env.POSTGRES_URL });
-    for (const { storage, table } of opened) {
-      await storage.close();
-      await pool.query(`DROP TABLE IF EXISTS ${table}`);
-    }
+    for (const table of tables) await pool.query(`DROP TABLE IF EXISTS ${table}`);
     await pool.end();
   });
 });
