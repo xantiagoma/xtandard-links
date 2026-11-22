@@ -178,7 +178,4 @@ export const manifest = defineSiteManifest({
   rootModule: "links",
   base: "/xtandard-links",
   sidebar,
-  // The favicons and the social card, plus the bare symbol (scripts/brand-assets.sh keeps the
-  // committed copies in site/public/ in step with docs/assets/).
-  publicAssets: ["favicon.svg", "favicon.ico", "apple-touch-icon.png", "social.png", "symbol.svg"],
 });
